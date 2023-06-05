@@ -1,19 +1,21 @@
 import pandas as pd
 
+import SampleinlogClass
+
 
 class Laserlog:
-    def __init__(self, clean_laserlog_dataframe: pd.DataFrame):
+    def __init__(self, experiment, clean_laserlog_dataframe: pd.DataFrame):
+        self.experiment = experiment
         self.clean_laserlog_dataframe = clean_laserlog_dataframe
         self.sampleinlog_objects_dictionary = {}
 
     def divide_clean_logfile_dataframe_into_samples(self):
         df = self.clean_laserlog_dataframe
-        chunks = []
+        sample_chunks_dictionary: dict = {}
 
         # Initialize variables
         start_idx = None
-        end_idx = None
-        pause_flag = False
+        chunk_counter = 1
 
         # Iterate over DataFrame rows
         for idx, row in df.iterrows():
@@ -25,16 +27,14 @@ class Laserlog:
 
                 # Check for start condition
                 if 'start' in marker:
-                    # Check if previous chunk is already in progress
                     if start_idx is not None:
-                        # Add previous chunk to the list
-                        chunk = df.iloc[start_idx:end_idx + 1]
-                        chunks.append(chunk)
+                        self.experiment.send_error_message(title='Logfile Error',
+                                                           message='Logfile shows new pattern starting without previous '
+                                                                   'pattern being completed by end statement')
+                        break
 
                     # Set start index for new chunk
                     start_idx = idx
-                    end_idx = None
-                    pause_flag = False
 
                 # Check for end condition
                 if 'end' in marker:
@@ -42,41 +42,22 @@ class Laserlog:
                     end_idx = idx
 
                     # Add the current row to the chunk
-                    chunk = df.iloc[start_idx:end_idx + 1]
-                    chunks.append(chunk)
+                    sample_chunk = df.iloc[start_idx:end_idx + 2]
+                    sample_chunk = sample_chunk.reset_index(drop=True)
+                    sample_chunks_dictionary[f'Sample_{chunk_counter}'] = sample_chunk
+                    chunk_counter += 1
 
                     # Reset start and end indices
                     start_idx = None
-                    end_idx = None
-                    pause_flag = False
-
-                # Check for pause condition
-                if 'pause' in marker:
-                    # Set pause flag to True
-                    pause_flag = True
-
-                # Check if pause flag is True and next row has 'start' condition
-                if pause_flag and 'start' in marker:
-                    # Add previous chunk to the list
-                    chunk = df.iloc[start_idx:end_idx + 1]
-                    chunks.append(chunk)
-
-                    # Set start index for new chunk
-                    start_idx = idx
-                    end_idx = None
-                    pause_flag = False
-
-        # Add the last chunk if it hasn't been added yet
-        if start_idx is not None and end_idx is None:
-            chunk = df.iloc[start_idx:]
-            chunks.append(chunk)
-
-        # chunks list now contains separate DataFrames representing the chunks of the original DataFrame
-
-        return chunks
+        return sample_chunks_dictionary
 
     def build_sampleinlog_objects(self):
-        pass
+        sample_chunks_dictionary = self.divide_clean_logfile_dataframe_into_samples()
+        for sample, logfile in sample_chunks_dictionary.items():
+            sampleinlog = SampleinlogClass.Sampleinlog(sample=sample,
+                                                       logfile_slice=logfile)
 
-    def get_log_information_of_rawdata_sample(self, sample_name: str):
-        pass
+            self.sampleinlog_objects_dictionary[sample] = sampleinlog
+
+    def get_log_information_of_rawdata_sample(self, sample_number: str):
+        return self.sampleinlog_objects_dictionary[sample_number].get_true_line_information_dictionary(), self.sampleinlog_objects_dictionary[sample_number].get_outer_dimensions_dictionary()

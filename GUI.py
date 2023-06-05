@@ -1,5 +1,6 @@
 import pandas as pd
 import tkinter as tk
+from tkinter import messagebox
 from tkinter import filedialog
 from tkinter import ttk
 import numpy as np
@@ -311,10 +312,16 @@ class GUI:
 
         with open(self.logfile_filepath) as f:
             # pattern_dataframe = pd.read_csv(f, skipinitialspace=True).fillna('Faulty Line')
-            logfile_dataframe = pd.read_csv(f, skipinitialspace=True, on_bad_lines='skip', index_col=False)
+            logfile_dataframe = pd.read_csv(f, usecols=['Pattern #', 'Name', 'Type', 'Run Queue Order',
+                                                        'Grid Spacing(Î¼m)', 'X(um)', 'Y(um)'], index_col=False)
 
-        self.experiment = ExperimentClass.Experiment(raw_laser_logfile_dataframe=logfile_dataframe,
+        self.experiment = ExperimentClass.Experiment(gui=self,
+                                                     raw_laser_logfile_dataframe=logfile_dataframe,
                                                      sample_rawdata_dictionary=sample_rawdata_dictionary,
                                                      data_type=self.data_type.get())
 
         self.experiment.build_rectangular_data()
+
+    def popup_error_message(self, title, message):
+        popup_error = messagebox.showerror(title=title, message=message)
+

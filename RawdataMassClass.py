@@ -14,3 +14,7 @@ class RawdataMass:
                                            line=line)
             self.line_dictionary[line] = line_instance
 
+    def build_true_rawdata_lines(self, true_line_dictionary, outer_dimensions_dictionary):
+        pass
+
+

@@ -37,7 +37,8 @@ def get_dwelltimes_from_rawdata(masses: list, dataframe: pd.DataFrame):
 
 
 class Experiment:
-    def __init__(self, raw_laser_logfile_dataframe: pd.DataFrame, sample_rawdata_dictionary: dict, data_type: str):
+    def __init__(self, gui, raw_laser_logfile_dataframe: pd.DataFrame, sample_rawdata_dictionary: dict, data_type: str):
+        self.gui = gui
         self.raw_laser_logfile_dataframe: pd.DataFrame = raw_laser_logfile_dataframe
         self.sample_rawdata_dictionary: dict = sample_rawdata_dictionary
         self.data_type = data_type
@@ -46,9 +47,23 @@ class Experiment:
         self.RawdataSample_objects_dictionary: dict = {}
 
     def build_Laserlog_object(self):
-        self.laserlog_object = LaserlogClass.Laserlog(clean_laserlog_dataframe=self.raw_laser_logfile_dataframe)
+
+        # Keywords for each column
+        keywords_for_filtering = {
+            'Type': ['Lasso'],
+            'Run Queue Order': [-1],
+            'X(um)': [np.nan],
+            'Y(um)': [np.nan]
+        }
+        # Filter rows
+        filtered_df = self.raw_laser_logfile_dataframe
+        for col, key_list in keywords_for_filtering.items():
+            filtered_df = filtered_df[~filtered_df[col].isin(key_list)]
+        filtered_df = filtered_df.reset_index(drop=True)
+        self.laserlog_object = LaserlogClass.Laserlog(experiment=self, clean_laserlog_dataframe=filtered_df)
 
     def build_rawdatasample_objects(self):
+        sample_counter = 1
         if self.data_type == 'iCap TQ (Daisy)':
             rawdata_extracted_masses_dictionary = {}
             for sample_name, sample_rawdata_dataframe in self.sample_rawdata_dictionary.items():
@@ -78,9 +93,12 @@ class Experiment:
                             # Add the extracted array to the dictionary
                             extracted_sample_column_dictionary[col] = extracted_array
                     rawdata_extracted_masses_dictionary[i] = extracted_sample_column_dictionary
-                rawdatasample = RawdataSampleClass.RawdataSample(name=sample_name,
+                rawdatasample = RawdataSampleClass.RawdataSample(experiment=self,
+                                                                 name=sample_name,
                                                                  rawdata_dictionary=rawdata_extracted_masses_dictionary,
-                                                                 dwelltime_dictionary=dwelltime_dictionary)
+                                                                 dwelltime_dictionary=dwelltime_dictionary,
+                                                                 sample_number=sample_counter)
+                sample_counter +=1
                 self.RawdataSample_objects_dictionary[sample_name] = rawdatasample
 
         if self.data_type == 'Agilent 7900':
@@ -101,18 +119,24 @@ class Experiment:
                 for line, raw_dataframe in sample_rawdata_dataframe.items():
                     for mass in mass_options_list:
                         rawdata_extracted_masses_dictionary[mass][f'Line_{line}'] = raw_dataframe[mass].to_numpy()
-                rawdatasample = RawdataSampleClass.RawdataSample(name=sample_name,
+                rawdatasample = RawdataSampleClass.RawdataSample(experiment=self,
+                                                                 name=sample_name,
                                                                  rawdata_dictionary=rawdata_extracted_masses_dictionary,
-                                                                 dwelltime_dictionary=dwelltime_dictionary)
+                                                                 dwelltime_dictionary=dwelltime_dictionary,
+                                                                 sample_number=sample_counter)
+                sample_counter += 1
                 self.RawdataSample_objects_dictionary[sample_name] = rawdatasample
 
 
 
 
-    def pass_sample_logfile_information(self, sample_name: str):
-        pass
+    def pass_sample_logfile_information(self, sample_number: str):
+        return self.laserlog_object.get_log_information_of_rawdata_sample(sample_number)
 
     def build_rectangular_data(self):
         self.build_Laserlog_object()
-        self.laserlog_object.divide_clean_logfile_dataframe_into_samples()
-        print('success')
+        self.laserlog_object.build_sampleinlog_objects()
+        self.build_rawdatasample_objects()
+
+    def send_error_message(self, title, message):
+        self.gui.popup_error_message(title, message)
