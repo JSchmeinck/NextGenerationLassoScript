@@ -40,14 +40,16 @@ def get_dwelltimes_from_rawdata(masses: list, dataframe: pd.DataFrame):
 
 
 class Experiment:
-    def __init__(self, gui, raw_laser_logfile_dataframe: pd.DataFrame, sample_rawdata_dictionary: dict, data_type: str):
+    def __init__(self, gui, raw_laser_logfile_dataframe: pd.DataFrame, sample_rawdata_dictionary: dict, data_type: str,
+                 logfile_filepath: str):
         self.gui = gui
         self.raw_laser_logfile_dataframe: pd.DataFrame = raw_laser_logfile_dataframe
         self.sample_rawdata_dictionary: dict = sample_rawdata_dictionary
         self.data_type = data_type
 
-        self.laserlog_object: LaserlogClass.Laserlog = None
+        self.laserlog_object: LaserlogClass.Laserlog
         self.RawdataSample_objects_dictionary: dict = {}
+        self.logfile_filepath: str = logfile_filepath
 
     def build_Laserlog_object(self):
 
@@ -63,7 +65,10 @@ class Experiment:
         for col, key_list in keywords_for_filtering.items():
             filtered_df = filtered_df[~filtered_df[col].isin(key_list)]
         filtered_df = filtered_df.reset_index(drop=True)
-        self.laserlog_object = LaserlogClass.Laserlog(experiment=self, clean_laserlog_dataframe=filtered_df)
+        name = os.path.basename(self.logfile_filepath).removesuffix('.csv')
+        self.laserlog_object = LaserlogClass.Laserlog(experiment=self,
+                                                      clean_laserlog_dataframe=filtered_df,
+                                                      name=name)
 
     def build_rawdatasample_objects(self):
         sample_counter = 1
@@ -141,30 +146,61 @@ class Experiment:
 
     def build_rectangular_data(self):
         self.build_Laserlog_object()
-        self.laserlog_object.build_sampleinlog_objects()
+        self.gui.increase_progress(10)
+        state_log = self.laserlog_object.build_sampleinlog_objects()
+        if state_log is False:
+            self.send_error_message(title='Logfile Error',
+                                    message='Logfile shows new pattern starting without previous '
+                                            'pattern being completed by end statement')
+            self.gui.reset_progress()
+            return
+        self.gui.increase_progress(30)
         self.build_rawdatasample_objects()
+        self.gui.increase_progress(10)
         for i in self.RawdataSample_objects_dictionary.values():
             i.build_rawdatamass_objects()
+        self.gui.increase_progress(10)
         state = self.match_log_and_sample()
         if state is False:
             self.send_error_message(title='Match Error',
                                     message='Unable to match laser logfile and rawdata files!')
+            self.gui.reset_progress()
             return
         for i in self.RawdataSample_objects_dictionary.values():
             i.build_true_rawdata_lines()
+        self.gui.increase_progress(20)
         state = self.build_new_rawdata_files()
+        self.gui.increase_progress(20)
         if state is False:
             self.send_error_message(title='Export Path Error',
                                     message='No Directory for the export of the new rectangular rawdata files has been chosen!')
+            self.gui.reset_progress()
             return
+        else:
+            self.send_info_message(title='File Created',
+                                   message='The rectangular rawdata Files have been successfully created.')
 
     def build_laser_ablation_times(self):
         self.build_Laserlog_object()
-        self.laserlog_object.build_sampleinlog_objects()
-        self.laserlog_object.build_laser_pattern_duration_sheet()
+        state_log = self.laserlog_object.build_sampleinlog_objects()
+        if state_log is False:
+            self.send_error_message(title='Logfile Error',
+                                    message='Logfile shows new pattern starting without previous '
+                                            'pattern being completed by end statement')
+            self.gui.reset_progress()
+            return
+        state = self.laserlog_object.build_laser_pattern_duration_sheet()
+        if state is False:
+            self.send_error_message(title='Export Path Error',
+                                    message='No Directory for the export of the pattern duration file has been chosen!')
+            self.gui.reset_progress()
+            return
 
     def send_error_message(self, title, message):
         self.gui.popup_error_message(title, message)
+
+    def send_info_message(self, title, message):
+        self.gui.popup_info_message(title, message)
 
     def send_yesno_message(self, title, message):
         return self.gui.popup_yesno_message(title, message)
@@ -251,8 +287,6 @@ class Experiment:
             state = self.export_data(final_dataframe, sample_name)
             if state is False:
                 return False
-        self.gui.popup_info_message(title='File Created',
-                                    message='The rectangular rawdata Files have been successfully created')
         return True
 
     def build_dwelltime_array(self, sample, mass):
@@ -266,6 +300,24 @@ class Experiment:
                 index=False,
                 sep=self.gui.get_separator_export(),
                 header=False)
+            return True
+        except PermissionError:
+            return False
+
+    def export_pattern_duration_data(self, dictionary, name):
+        path = self.get_export_path()
+        try:
+            writer = pd.ExcelWriter(f'{path}/{name}_pattern_duration.xlsx',
+                                    engine='xlsxwriter')
+
+            for sample, sample_dict in dictionary.items():
+                dataframe = pd.DataFrame(sample_dict)
+                dataframe.to_excel(writer, sheet_name=sample, index=False, header=False)
+
+            writer.close()
+
+            self.send_info_message(title='File Created',
+                                   message='The Laser Duration file has been successfully created')
             return True
         except PermissionError:
             return False

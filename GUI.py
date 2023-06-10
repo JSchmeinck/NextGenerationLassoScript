@@ -8,12 +8,24 @@ import os
 import ExperimentClass
 
 
+class CustomTreeview(ttk.Treeview):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Configure the custom header style
+        style = ttk.Style(self)
+        style.configure("Custom.Treeview.Heading", font=("Segoe UI", 10, "bold"))
+
+        # Apply the custom style to the Treeview widget
+        self["style"] = "Custom.Treeview"
+
+
 class GUI:
     def __init__(self, master_window):
         # Setting up the main window
         self.master_window = master_window
         self.master_window.title("Lasso Script")
-        self.master_window.geometry('900x450')
+        self.master_window.geometry('700x450')
         self.master_window.resizable(width=False, height=False)
 
         # The experiment Class that will be created for the post ablation data recreation
@@ -46,16 +58,17 @@ class GUI:
         self.import_logfile_button = ttk.Button(text='Import Logfile',
                                                 command=self.import_logfile,
                                                 width=28)
-        self.logfile_treeview = ttk.Treeview(master=self.master_window,
+        self.logfile_treeview = CustomTreeview(master=self.master_window,
                                              height=15, show='headings',
                                              columns='Logfile')
         self.logfile_treeview.heading(column='# 1',
                                       text='Logfile')
+
         self.import_samples_button = ttk.Button(master=self.master_window,
                                                 text='Import Samples',
                                                 command=self.import_samples,
                                                 width=28)
-        self.samples_treeview = ttk.Treeview(master=self.master_window,
+        self.samples_treeview = CustomTreeview(master=self.master_window,
                                              height=15,
                                              show='headings',
                                              columns='Samples')
@@ -64,31 +77,45 @@ class GUI:
                                      stretch=tk.NO, width=250)
         self.samples_treeview.heading(column='# 1',
                                       text='Samples')
-        self.conversion_frame = ttk.Frame(self.master_window, width=800, height=70)
+        # The bottom line menu
+        self.conversion_frame = ttk.Frame(master=self.master_window,
+                                          width=800,
+                                          height=70)
         self.export_path = tk.StringVar()
-        self.directory_entry = ttk.Entry(master=self.conversion_frame, state='readonly', textvariable=self.export_path)
-
+        self.directory_entry = ttk.Entry(master=self.conversion_frame,
+                                         state='readonly',
+                                         textvariable=self.export_path,
+                                         width=40)
         self.browse_directory_button = ttk.Button(master=self.conversion_frame,
                                                   text='Browse',
 
                                                   command=self.export_directory)
         self.go_button = ttk.Button(master=self.conversion_frame,
                                     text='Convert',
-                                    command=self.build_experiment_objects
-                                    )
-        self.build_laser_duration_button = ttk.Button(master=self.conversion_frame, text='Build pattern duration', command=self.build_laserduration_sheet)
-        #self.progressbar = ttk.Progressbar(master=self.master_window,
-                                           #mode='determinate',
-                                           #maximum=100,
-                                           #orient=tk.HORIZONTAL)
+                                    command=self.build_experiment_objects)
+        self.build_laser_duration_button = ttk.Button(master=self.conversion_frame,
+                                                      text='Build pattern duration',
+                                                      command=self.build_laserduration_sheet)
+        self.progress = tk.IntVar()
+        self.progressbar = ttk.Progressbar(master=self.master_window,
+                                           mode='determinate',
+                                           maximum=100,
+                                           orient=tk.HORIZONTAL,
+                                           length=544,
+                                           variable=self.progress)
         self.move_up_button = ttk.Button(text="Move Up",
                                          command=lambda: self.moveup(),
-                                         width=10)
+                                         width=15)
         self.move_down_button = ttk.Button(text="Move Down",
                                            command=lambda: self.movedown(),
-                                           width=10)
-        self.separator_frame = ttk.Frame(self.master_window, width=300, height=150)
-        self.separator_header_import = ttk.Label(self.separator_frame, text='separator import', borderwidth=5)
+                                           width=15)
+        # The separator menu
+        self.separator_frame = ttk.Frame(master=self.master_window,
+                                         width=100,
+                                         height=120)
+        self.separator_header_import = ttk.Label(master=self.separator_frame,
+                                                 text='separator import',
+                                                 borderwidth=5)
         self.separator_import = tk.StringVar(value=';')
         option_list = (';', ',')
         self.separator_menu_import = ttk.OptionMenu(self.separator_frame,
@@ -101,23 +128,28 @@ class GUI:
         self.separator_menu_export = ttk.OptionMenu(self.separator_frame,
                                                     self.separator_export,
                                                     *option_list)
-        self.header_instruments = ttk.Label(master=self.separator_frame,
-                                            text='Chosen MS',
+        # The data type menu
+        self.datatype_frame = ttk.Frame(master=self.master_window,
+                                        width=130,
+                                        height=100)
+        self.header_instruments = ttk.Label(master=self.datatype_frame,
+                                            text='Data Type',
                                             borderwidth=5)
         self.data_type = tk.StringVar()
         self.data_type.set('iCap TQ (Daisy)')
-        self.icap_tq_radiobutton = ttk.Radiobutton(master=self.separator_frame,
+        self.icap_tq_radiobutton = ttk.Radiobutton(master=self.datatype_frame,
                                                    text='iCap TQ (Daisy)',
                                                    variable=self.data_type,
                                                    value='iCap TQ (Daisy)',
                                                    command=self.change_of_instrument,
                                                    width=30)
-        self.agilent7900_radiobutton = ttk.Radiobutton(master=self.separator_frame,
+        self.agilent7900_radiobutton = ttk.Radiobutton(master=self.datatype_frame,
                                                        text='Agilent 7900',
                                                        variable=self.data_type,
                                                        value='Agilent 7900',
                                                        command=self.change_of_instrument,
                                                        width=30)
+
         self.master_window.grid_columnconfigure(index=0, weight=1)
         self.master_window.grid_columnconfigure(index=1, weight=1)
         self.master_window.grid_columnconfigure(index=2, weight=1)
@@ -133,15 +165,17 @@ class GUI:
         self.import_samples_button.grid(row=0, column=1, sticky='s', pady=5)
         self.samples_treeview.grid(row=1, column=1, rowspan=2)
         self.conversion_frame.grid(row=3, column=0, columnspan=2, sticky='n', pady=10)
-        self.go_button.grid(row=0, column=2)
+        self.go_button.grid(row=0, column=2, padx=(20, 0))
         self.build_laser_duration_button.grid(row=0, column=3)
         self.directory_entry.grid(row=0, column=0)
         self.browse_directory_button.grid(row=0, column=1)
-        #self.progressbar.grid(row=3, column=2)
+        self.progressbar.grid(row=4, column=0, columnspan=2, sticky='n')
         self.move_up_button.grid(row=1, column=2, sticky='nw', pady=10)
-        self.move_down_button.grid(row=1, column=2, sticky='nw', pady=40)
-        self.separator_frame.grid(row=2, column=2, sticky='w')
+        self.move_down_button.grid(row=1, column=2, sticky='nw', pady=(40, 0))
+        self.separator_frame.grid(row=1, column=2, sticky='w', pady=(70, 0))
         self.separator_frame.grid_propagate(False)
+        self.datatype_frame.grid(row=2, column=2, sticky='w', pady=0)
+        self.datatype_frame.grid_propagate(False)
         self.separator_header_import.grid(row=0, column=0, pady=(10, 0), sticky='we', padx=5)
         self.separator_menu_import.grid(row=1, column=0)
         self.separator_header_export.grid(row=2, column=0, sticky='nw', pady=(20, 0), padx=6)
@@ -171,6 +205,7 @@ class GUI:
                                      index=0,
                                      text='',
                                      values=self.logfile_filename)
+        self.reset_progress()
         return self.logfile_filepath
 
     def import_samples(self):
@@ -234,6 +269,7 @@ class GUI:
                           pattern_csv_filename_withoutcsv + \
                           '_lasso_rawdata.csv'
             self.export_path_list.append(export_name)
+        self.reset_progress()
 
     def change_ablation_step(self):
         pass
@@ -322,7 +358,8 @@ class GUI:
         self.experiment = ExperimentClass.Experiment(gui=self,
                                                      raw_laser_logfile_dataframe=logfile_dataframe,
                                                      sample_rawdata_dictionary=sample_rawdata_dictionary,
-                                                     data_type=self.data_type.get())
+                                                     data_type=self.data_type.get(),
+                                                     logfile_filepath=self.logfile_filepath)
 
         self.experiment.build_rectangular_data()
 
@@ -342,8 +379,9 @@ class GUI:
 
         self.experiment = ExperimentClass.Experiment(gui=self,
                                                      raw_laser_logfile_dataframe=logfile_dataframe,
-                                                     sample_rawdata_dictionary=None,
-                                                     data_type=self.data_type.get())
+                                                     sample_rawdata_dictionary={},
+                                                     data_type=self.data_type.get(),
+                                                     logfile_filepath=self.logfile_filepath)
 
         self.experiment.build_laser_ablation_times()
 
@@ -371,5 +409,14 @@ class GUI:
 
     def get_export_path(self):
         return self.export_path.get()
+
+    def increase_progress(self, step):
+        current_progress = self.progress.get()
+        self.progress.set(current_progress+step)
+        self.master_window.update_idletasks()
+
+    def reset_progress(self):
+        self.progress.set(0)
+        self.master_window.update_idletasks()
 
 
