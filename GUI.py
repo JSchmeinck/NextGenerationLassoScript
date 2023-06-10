@@ -64,13 +64,23 @@ class GUI:
                                      stretch=tk.NO, width=250)
         self.samples_treeview.heading(column='# 1',
                                       text='Samples')
-        self.go_button = ttk.Button(text='calculate rectangle rawdata file',
-                                    command=self.build_experiment_objects,
-                                    width=50)
-        self.progressbar = ttk.Progressbar(master=self.master_window,
-                                           mode='determinate',
-                                           maximum=100,
-                                           orient=tk.HORIZONTAL)
+        self.conversion_frame = ttk.Frame(self.master_window, width=800, height=70)
+        self.export_path = tk.StringVar()
+        self.directory_entry = ttk.Entry(master=self.conversion_frame, state='readonly', textvariable=self.export_path)
+
+        self.browse_directory_button = ttk.Button(master=self.conversion_frame,
+                                                  text='Browse',
+
+                                                  command=self.export_directory)
+        self.go_button = ttk.Button(master=self.conversion_frame,
+                                    text='Convert',
+                                    command=self.build_experiment_objects
+                                    )
+        self.build_laser_duration_button = ttk.Button(master=self.conversion_frame, text='Build pattern duration', command=self.build_laserduration_sheet)
+        #self.progressbar = ttk.Progressbar(master=self.master_window,
+                                           #mode='determinate',
+                                           #maximum=100,
+                                           #orient=tk.HORIZONTAL)
         self.move_up_button = ttk.Button(text="Move Up",
                                          command=lambda: self.moveup(),
                                          width=10)
@@ -122,8 +132,12 @@ class GUI:
         self.logfile_treeview.grid(row=1, column=0, rowspan=2)
         self.import_samples_button.grid(row=0, column=1, sticky='s', pady=5)
         self.samples_treeview.grid(row=1, column=1, rowspan=2)
-        self.go_button.grid(row=3, column=0, columnspan=2, sticky='n', pady=10)
-        self.progressbar.grid(row=3, column=2)
+        self.conversion_frame.grid(row=3, column=0, columnspan=2, sticky='n', pady=10)
+        self.go_button.grid(row=0, column=2)
+        self.build_laser_duration_button.grid(row=0, column=3)
+        self.directory_entry.grid(row=0, column=0)
+        self.browse_directory_button.grid(row=0, column=1)
+        #self.progressbar.grid(row=3, column=2)
         self.move_up_button.grid(row=1, column=2, sticky='nw', pady=10)
         self.move_down_button.grid(row=1, column=2, sticky='nw', pady=40)
         self.separator_frame.grid(row=2, column=2, sticky='w')
@@ -244,43 +258,26 @@ class GUI:
             self.samples_treeview.delete(*self.samples_treeview.get_children())
 
     def moveup(self):
-        leaves = self.samples_treeview.selection()
-        for i in leaves:
-            self.samples_treeview.move(i, self.samples_treeview.parent(i),
-                                       self.samples_treeview.index(i) - 1)
-
-        self.export_path_list = []
-
-        for file in self.list_of_files:
-            pattern_csv_filename = os.path.basename(file)
-            pattern_csv_filename_withoutcsv = pattern_csv_filename.replace('.csv', '')
-
-            self.pattern_csv_filepath_without_filename = file.replace(pattern_csv_filename, '')
-
-            export_name = self.pattern_csv_filepath_without_filename + 'lasso_rawdata_folder/' + \
-                          pattern_csv_filename_withoutcsv + \
-                          '_lasso_rawdata.csv'
-            self.export_path_list.append(export_name)
+        selection = self.samples_treeview.selection()
+        if selection:
+            selected_item = selection[0]
+            index = self.samples_treeview.index(selected_item)
+            if index > 0:
+                self.samples_treeview.move(selected_item, '', index - 1)
+                self.list_of_files[index], self.list_of_files[index - 1] = self.list_of_files[index - 1], self.list_of_files[index]
+                self.filename_list[index], self.filename_list[index - 1] = self.filename_list[index - 1], \
+                                                                           self.filename_list[index]
 
     def movedown(self):
-        leaves = self.samples_treeview.selection()
-        for i in reversed(leaves):
-            self.samples_treeview.move(i, self.samples_treeview.parent(i),
-                                       self.samples_treeview.index(i) + 1)
-
-        self.export_path_list = []
-
-        for file in self.list_of_files:
-            pattern_csv_filename = os.path.basename(file)
-            pattern_csv_filename_withoutcsv = pattern_csv_filename.replace('.csv', '')
-
-            self.pattern_csv_filepath_without_filename = file.replace(pattern_csv_filename, '')
-
-            export_name = self.pattern_csv_filepath_without_filename + 'lasso_rawdata_folder/' + \
-                          pattern_csv_filename_withoutcsv + \
-                          '_lasso_rawdata.csv'
-            self.export_path_list.append(export_name)
-
+        selection = self.samples_treeview.selection()
+        if selection:
+            selected_item = selection[0]
+            index = self.samples_treeview.index(selected_item)
+            if index < len(self.list_of_files) - 1:
+                self.samples_treeview.move(selected_item, '', index + 2)
+                self.list_of_files[index], self.list_of_files[index + 1] = self.list_of_files[index + 1], self.list_of_files[index]
+                self.filename_list[index], self.filename_list[index + 1] = self.filename_list[index + 1], \
+                                                                           self.filename_list[index]
     def build_experiment_objects(self):
         sample_rawdata_dictionary = {}
         if self.data_type.get() == 'iCap TQ (Daisy)':
@@ -309,11 +306,18 @@ class GUI:
                                              engine='python')
                         individual_lines_dictionary[f'Line_{ticker+1}'] = df
                 sample_rawdata_dictionary[f'{self.filename_list[n]}'] = individual_lines_dictionary
+        try:
+            with open(self.logfile_filepath) as f:
+                # pattern_dataframe = pd.read_csv(f, skipinitialspace=True).fillna('Faulty Line')
 
-        with open(self.logfile_filepath) as f:
-            # pattern_dataframe = pd.read_csv(f, skipinitialspace=True).fillna('Faulty Line')
-            logfile_dataframe = pd.read_csv(f, usecols=['Pattern #', 'Name', 'Type', 'Run Queue Order',
-                                                        'Grid Spacing(Î¼m)', 'X(um)', 'Y(um)'], index_col=False)
+                logfile_dataframe = pd.read_csv(f, usecols=['Pattern #', 'Name', 'Type', 'Run Queue Order',
+                                                                'Grid Spacing(Î¼m)', 'Scan Speed(Î¼m/sec)', 'X(um)', 'Y(um)'], index_col=False)
+
+        except:
+            with open(self.logfile_filepath) as f:
+                logfile_dataframe = pd.read_csv(f, usecols=['ï»¿Pattern #', 'Name', 'Type', 'Run Queue Order',
+                                                            'Grid Spacing(Î¼m)', 'Scan Speed(Î¼m/sec)', 'X(um)',
+                                                            'Y(um)'], index_col=False)
 
         self.experiment = ExperimentClass.Experiment(gui=self,
                                                      raw_laser_logfile_dataframe=logfile_dataframe,
@@ -322,6 +326,50 @@ class GUI:
 
         self.experiment.build_rectangular_data()
 
+    def build_laserduration_sheet(self):
+        try:
+            with open(self.logfile_filepath) as f:
+                # pattern_dataframe = pd.read_csv(f, skipinitialspace=True).fillna('Faulty Line')
+
+                logfile_dataframe = pd.read_csv(f, usecols=['Pattern #', 'Name', 'Type', 'Run Queue Order',
+                                                                'Grid Spacing(Î¼m)', 'Scan Speed(Î¼m/sec)', 'X(um)', 'Y(um)'], index_col=False)
+
+        except:
+            with open(self.logfile_filepath) as f:
+                logfile_dataframe = pd.read_csv(f, usecols=['ï»¿Pattern #', 'Name', 'Type', 'Run Queue Order',
+                                                            'Grid Spacing(Î¼m)', 'Scan Speed(Î¼m/sec)', 'X(um)',
+                                                            'Y(um)'], index_col=False)
+
+        self.experiment = ExperimentClass.Experiment(gui=self,
+                                                     raw_laser_logfile_dataframe=logfile_dataframe,
+                                                     sample_rawdata_dictionary=None,
+                                                     data_type=self.data_type.get())
+
+        self.experiment.build_laser_ablation_times()
+
     def popup_error_message(self, title, message):
         popup_error = messagebox.showerror(title=title, message=message)
+
+    def popup_info_message(self, title, message):
+        popup_info = messagebox.showinfo(title=title, message=message)
+
+    def popup_yesnocancel_message(self, title, message):
+        popup_yes_no_cancel = messagebox.askyesnocancel(title=title, message=message)
+
+    def popup_yesno_message(self, title, message):
+        popup_yes_no = messagebox.askyesno(title=title, message=message)
+        return popup_yes_no
+
+    def export_directory(self):
+        path = filedialog.askdirectory()
+        self.export_path.set(path)
+        self.directory_entry.delete(0, tk.END)
+        self.directory_entry.insert(0, path)
+
+    def get_separator_export(self):
+        return self.separator_export.get()
+
+    def get_export_path(self):
+        return self.export_path.get()
+
 

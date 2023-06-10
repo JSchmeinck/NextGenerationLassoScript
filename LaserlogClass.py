@@ -1,5 +1,7 @@
 import pandas as pd
-
+import math
+from tkinter import filedialog
+import numpy as np
 import SampleinlogClass
 
 
@@ -28,9 +30,9 @@ class Laserlog:
                 # Check for start condition
                 if 'start' in marker:
                     if start_idx is not None:
-                        self.experiment.send_error_message(title='Logfile Error',
-                                                           message='Logfile shows new pattern starting without previous '
-                                                                   'pattern being completed by end statement')
+                        self.send_error_message(title='Logfile Error',
+                                                message='Logfile shows new pattern starting without previous '
+                                                        'pattern being completed by end statement')
                         break
 
                     # Set start index for new chunk
@@ -53,11 +55,67 @@ class Laserlog:
 
     def build_sampleinlog_objects(self):
         sample_chunks_dictionary = self.divide_clean_logfile_dataframe_into_samples()
-        for sample, logfile in sample_chunks_dictionary.items():
-            sampleinlog = SampleinlogClass.Sampleinlog(sample=sample,
-                                                       logfile_slice=logfile)
+        for sample_number, logfile in sample_chunks_dictionary.items():
+            sampleinlog = SampleinlogClass.Sampleinlog(sample=sample_number,
+                                                       logfile_slice=logfile,
+                                                       log=self)
 
-            self.sampleinlog_objects_dictionary[sample] = sampleinlog
+            self.sampleinlog_objects_dictionary[sample_number] = sampleinlog
 
     def get_log_information_of_rawdata_sample(self, sample_number: str):
-        return self.sampleinlog_objects_dictionary[sample_number].get_true_line_information_dictionary(), self.sampleinlog_objects_dictionary[sample_number].get_outer_dimensions_dictionary()
+        return self.sampleinlog_objects_dictionary[sample_number].get_true_line_information_dictionary(), self.sampleinlog_objects_dictionary[sample_number].get_outer_dimensions_dictionary(), self.sampleinlog_objects_dictionary[sample_number].get_scan_speed()
+
+    def send_error_message(self, title, message):
+        self.experiment.send_error_message(title=title, message=message)
+
+    def build_lengh_of_sample_dictionary(self):
+        length_of_sample_dictionary = {}
+        for i in self.sampleinlog_objects_dictionary.values():
+            length_of_sample = i.get_amount_of_lines()
+            length_of_sample_dictionary[i] = length_of_sample
+        return length_of_sample_dictionary
+
+    def build_laser_pattern_duration_sheet(self):
+        sample_line_lengh_dictionary = {}
+        for sample, instance in self.sampleinlog_objects_dictionary.items():
+            line_name_array = np.full(fill_value='Line Name', shape=1)
+            line_duration_array = np.full(fill_value='Line Duration', shape=1)
+            sample_line_lengh_dictionary[sample] = {}
+            scan_speed = instance.get_scan_speed()
+            raw_line_dictionary = instance.get_true_line_information_dictionary()
+            for line, line_info in raw_line_dictionary.items():
+
+                sample_line_lenghts_um = int((line_info[f'{line_info["lines included"][0]}_x_end'] -
+                                                    line_info[
+                                                        f'{line_info["lines included"][0]}_x_start']))
+                duration_of_line = math.ceil(sample_line_lenghts_um/scan_speed)
+                duration = np.full(fill_value=duration_of_line, shape=1)
+                name = np.full(fill_value=line, shape=1)
+
+                line_name_array = np.concatenate((line_name_array, name))
+                line_duration_array = np.concatenate((line_duration_array, duration))
+
+            sample_line_lengh_dictionary[sample]['Line Number'] = line_name_array
+            sample_line_lengh_dictionary[sample]['Duration in seconds'] = line_duration_array
+
+        self.export(sample_line_lengh_dictionary)
+
+
+    def export(self, dictionary):
+        path = self.experiment.gui.get_export_path()
+
+        writer = pd.ExcelWriter(f'{path}/pattern_duration.xlsx',
+            engine='xlsxwriter')
+
+        for sample, sample_dict in dictionary.items():
+            dataframe = pd.DataFrame(sample_dict)
+            dataframe.to_excel(writer, sheet_name=sample, index=False, header=False)
+
+        writer.close()
+
+        self.experiment.gui.popup_info_message(title='File Created', message='The Laser Duration file has been successfully created')
+
+    def get_sampleinlog_objects_dictionary(self):
+        return self.sampleinlog_objects_dictionary
+
+
