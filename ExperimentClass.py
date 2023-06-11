@@ -1,16 +1,40 @@
 import os
-
+from typing import Optional
 import pandas as pd
 import numpy as np
 import re
-
-# Static Functions
+from tkinter import messagebox
 import LaserlogClass
 import RawdataSampleClass
 
 
-def get_dwelltimes_from_rawdata(masses: list, dataframe: pd.DataFrame):
-    dwelltime_dictionary = {}
+def popup_error_message(title, message):
+    messagebox.showerror(title=title, message=message)
+
+
+def popup_info_message(title, message):
+    messagebox.showinfo(title=title, message=message)
+
+
+def popup_yesnocancel_message(title, message):
+    messagebox.askyesnocancel(title=title, message=message)
+
+
+def popup_yesno_message(title, message):
+    popup_yes_no = messagebox.askyesno(title=title, message=message)
+    return popup_yes_no
+
+
+def get_dwell_times_from_rawdata(masses: list, dataframe: pd.DataFrame):
+    """
+    Computes the average dwell time and a total dwell time cycle from a dataframe for the masses supplied
+    :param masses: a list of strings that match the mass column in the dataframe
+    :param dataframe: a dataframe that contains dwell time data and a column that shows the masses contained in the
+    mass list
+    :return: A dictionary that contains the dwell times for the supplied masses as well as a total Cycle time. key: mass
+    value: dwell time.
+    """
+    dwell_time_dictionary = {}
     average_of_last_mass = None
     for k, i in enumerate(masses):
         mask = dataframe['Unnamed: 2'].str.contains(i, case=False) & dataframe['Unnamed: 3'].str.contains('Time',
@@ -31,12 +55,12 @@ def get_dwelltimes_from_rawdata(masses: list, dataframe: pd.DataFrame):
             average_value_second_row = filtered_second_row.mean()
             dwelltime = average_value
             dwelltime_cycle = average_value_second_row - average_value
-            dwelltime_dictionary['Cycle'] = dwelltime_cycle
+            dwell_time_dictionary['Cycle'] = dwelltime_cycle
         else:
             dwelltime = average_value - average_of_last_mass
-        dwelltime_dictionary[i] = dwelltime
+        dwell_time_dictionary[i] = dwelltime
         average_of_last_mass = average_value
-    return dwelltime_dictionary
+    return dwell_time_dictionary
 
 
 class Experiment:
@@ -47,11 +71,11 @@ class Experiment:
         self.sample_rawdata_dictionary: dict = sample_rawdata_dictionary
         self.data_type = data_type
 
-        self.laserlog_object: LaserlogClass.Laserlog
+        self.laserlog_object: Optional[LaserlogClass.Laserlog] = None
         self.RawdataSample_objects_dictionary: dict = {}
         self.logfile_filepath: str = logfile_filepath
 
-    def build_Laserlog_object(self):
+    def build_laser_log_object(self):
 
         # Keywords for each column
         keywords_for_filtering = {
@@ -79,8 +103,8 @@ class Experiment:
                 mass_options_clean: np.ndarray = np.delete(mass_options, [0])
                 mass_options_list: list = list(mass_options_clean)
                 # Determine dwell times for each element and the total cycle time for each sample
-                dwelltime_dictionary = get_dwelltimes_from_rawdata(masses=mass_options_list,
-                                                                   dataframe=sample_rawdata_dataframe)
+                dwelltime_dictionary = get_dwell_times_from_rawdata(masses=mass_options_list,
+                                                                    dataframe=sample_rawdata_dataframe)
 
                 for k, i in enumerate(mass_options_list):
                     extracted_sample_column_dictionary = {}
@@ -145,13 +169,13 @@ class Experiment:
         return self.laserlog_object.get_log_information_of_rawdata_sample(sample_number)
 
     def build_rectangular_data(self):
-        self.build_Laserlog_object()
+        self.build_laser_log_object()
         self.gui.increase_progress(10)
         state_log = self.laserlog_object.build_sampleinlog_objects()
         if state_log is False:
-            self.send_error_message(title='Logfile Error',
-                                    message='Logfile shows new pattern starting without previous '
-                                            'pattern being completed by end statement')
+            popup_error_message(title='Logfile Error',
+                                message='Logfile shows new pattern starting without previous '
+                                        'pattern being completed by end statement')
             self.gui.reset_progress()
             return
         self.gui.increase_progress(30)
@@ -162,8 +186,8 @@ class Experiment:
         self.gui.increase_progress(10)
         state = self.match_log_and_sample()
         if state is False:
-            self.send_error_message(title='Match Error',
-                                    message='Unable to match laser logfile and rawdata files!')
+            popup_error_message(title='Match Error',
+                                message='Unable to match laser logfile and rawdata files!')
             self.gui.reset_progress()
             return
         for i in self.RawdataSample_objects_dictionary.values():
@@ -172,38 +196,30 @@ class Experiment:
         state = self.build_new_rawdata_files()
         self.gui.increase_progress(20)
         if state is False:
-            self.send_error_message(title='Export Path Error',
-                                    message='No Directory for the export of the new rectangular rawdata files has been chosen!')
+            popup_error_message(title='Export Path Error',
+                                message='No Directory for the export of '
+                                        'the new rectangular rawdata files has been chosen!')
             self.gui.reset_progress()
             return
         else:
-            self.send_info_message(title='File Created',
-                                   message='The rectangular rawdata Files have been successfully created.')
+            popup_info_message(title='File Created',
+                               message='The rectangular rawdata Files have been successfully created.')
 
     def build_laser_ablation_times(self):
-        self.build_Laserlog_object()
+        self.build_laser_log_object()
         state_log = self.laserlog_object.build_sampleinlog_objects()
         if state_log is False:
-            self.send_error_message(title='Logfile Error',
-                                    message='Logfile shows new pattern starting without previous '
-                                            'pattern being completed by end statement')
+            popup_error_message(title='Logfile Error',
+                                message='Logfile shows new pattern starting without previous '
+                                        'pattern being completed by end statement')
             self.gui.reset_progress()
             return
         state = self.laserlog_object.build_laser_pattern_duration_sheet()
         if state is False:
-            self.send_error_message(title='Export Path Error',
-                                    message='No Directory for the export of the pattern duration file has been chosen!')
+            popup_error_message(title='Export Path Error',
+                                message='No Directory for the export of the pattern duration file has been chosen!')
             self.gui.reset_progress()
             return
-
-    def send_error_message(self, title, message):
-        self.gui.popup_error_message(title, message)
-
-    def send_info_message(self, title, message):
-        self.gui.popup_info_message(title, message)
-
-    def send_yesno_message(self, title, message):
-        return self.gui.popup_yesno_message(title, message)
 
     def match_log_and_sample(self, match_by_line_count=False):
         length_of_sample_dictionary = self.laserlog_object.build_lengh_of_sample_dictionary()
@@ -216,11 +232,12 @@ class Experiment:
                 if amount_of_rawdata_lines == amount_of_log_lines:
                     pass
                 else:
-                    decider = self.send_yesno_message(title='Logfile and and Rawdata match issue',
-                                                      message='The amount of ablated lines dont match between the laser '
-                                                              'logfile and the predetermined rawdata file.'
-                                                              'Do you want to use automatic assignment? '
-                                                              'This only works if all of your samples have a unique amount of ablated lines.')
+                    decider = popup_yesno_message(title='Logfile and and Rawdata match issue',
+                                                  message='The amount of ablated lines dont match between the laser '
+                                                          'logfile and the predetermined rawdata file.'
+                                                          'Do you want to use automatic assignment? '
+                                                          'This only works if all of your samples have a unique '
+                                                          'amount of ablated lines.')
                     if decider is True:
                         self.match_log_and_sample(match_by_line_count=decider)
                         return True
@@ -316,8 +333,8 @@ class Experiment:
 
             writer.close()
 
-            self.send_info_message(title='File Created',
-                                   message='The Laser Duration file has been successfully created')
+            popup_info_message(title='File Created',
+                               message='The Laser Duration file has been successfully created')
             return True
         except PermissionError:
             return False

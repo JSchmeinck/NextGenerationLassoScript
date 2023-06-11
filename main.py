@@ -1,14 +1,15 @@
 import tkinter as tk
 import pandas as pd
 import numpy as np
-import GUI
+import GUI_Master
 
 
 class MainApp:
     def __init__(self, master_window):
         self.master_window = master_window
 
-        self.gui = GUI.GUI(master_window=self.master_window)
+        self.gui = GUI_Master.GUI(master_window=self.master_window)
+        self.gui.grid_gui_widgets()
 
     def show_gui(self):
         self.gui.grid_gui_widgets()
