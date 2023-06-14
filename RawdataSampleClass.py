@@ -1,12 +1,11 @@
-import pandas as pd
 import numpy as np
-
+from typing import Optional
 import RawdataMassClass
 import SampleinlogClass
 
 
 class RawdataSample:
-    def __init__(self, experiment, rawdata_dictionary, dwelltime_dictionary, name, sample_number):
+    def __init__(self, experiment, rawdata_dictionary, dwelltime_dictionary, name, sample_number, fill_value):
         self.experiment = experiment
         self.name = name
         self.sample_number = sample_number
@@ -17,6 +16,8 @@ class RawdataSample:
         self.max_length_dictionary: dict = {}
         self.sample_in_log: SampleinlogClass.Sampleinlog
         self.amount_of_lines = 0
+        self.fill_value = fill_value
+        self.sample_in_log: Optional[SampleinlogClass.Sampleinlog] = None
 
     def build_rawdatamass_objects(self):
         k = 0
@@ -24,7 +25,8 @@ class RawdataSample:
             rawdatamass = RawdataMassClass.RawdataMass(rawdata_line_dictionary=rawdata_line_dictionary,
                                                        mass=mass,
                                                        dwelltime=self.dwelltime_dictionary[mass],
-                                                       sample=self)
+                                                       sample=self,
+                                                       fill_value=self.fill_value)
             self.RawdataMass_objects_dictionary[mass] = rawdatamass
             if k == 0:
                 self.amount_of_lines = len(rawdata_line_dictionary)
@@ -35,7 +37,9 @@ class RawdataSample:
         outer_dimensions_dictionary = self.sample_in_log.get_outer_dimensions_dictionary()
         scan_speed = self.sample_in_log.get_scan_speed()
         for mass, mass_object in self.RawdataMass_objects_dictionary.items():
-            dictionary, max_length = mass_object.build_true_rawdata_lines(true_line_dictionary, outer_dimensions_dictionary, scan_speed)
+            dictionary, max_length = mass_object.build_true_rawdata_lines(true_line_dictionary,
+                                                                          outer_dimensions_dictionary,
+                                                                          scan_speed)
             self.rectangular_rawdata_dictionary[mass] = dictionary
             self.max_length_dictionary[mass] = max_length
 

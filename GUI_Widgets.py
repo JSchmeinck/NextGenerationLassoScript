@@ -83,23 +83,30 @@ class GUIWidgets:
                                            width=15)
         # The separator menu
         self.separator_frame = ttk.Frame(master=self.master_window,
-                                         width=100,
-                                         height=120)
+                                         width=110,
+                                         height=170)
         self.separator_header_import = ttk.Label(master=self.separator_frame,
-                                                 text='separator import',
+                                                 text='Delimiter import',
                                                  borderwidth=5)
         self.separator_import = tk.StringVar(value=';')
-        option_list = (';', ',')
+        option_list = (';', ',', 'Tab', 'Space')
         self.separator_menu_import = ttk.OptionMenu(self.separator_frame,
                                                     self.separator_import,
                                                     *option_list)
         self.separator_header_export = ttk.Label(master=self.separator_frame,
-                                                 text='separator export',
+                                                 text='Delimiter export',
                                                  borderwidth=5)
         self.separator_export = tk.StringVar(value=';')
         self.separator_menu_export = ttk.OptionMenu(self.separator_frame,
                                                     self.separator_export,
                                                     *option_list)
+        self.fill_value = tk.IntVar(value=0)
+        self.fill_value_header = ttk.Label(master=self.separator_frame,
+                                           text='fill_value',
+                                           borderwidth=5)
+        self.fill_value_entry = ttk.Entry(master=self.separator_frame,
+                                          textvariable=self.fill_value,
+                                          width=10)
         # The data type menu
         self.datatype_frame = ttk.Frame(master=self.master_window,
                                         width=130,
@@ -148,11 +155,12 @@ class GUIWidgets:
         self.separator_frame.grid_propagate(False)
         self.datatype_frame.grid(row=2, column=2, sticky='w', pady=0)
         self.datatype_frame.grid_propagate(False)
-        self.separator_header_import.grid(row=0, column=0, pady=(10, 0), sticky='we', padx=5)
-        self.separator_menu_import.grid(row=1, column=0)
-        self.separator_header_export.grid(row=2, column=0, sticky='nw', pady=(20, 0), padx=6)
+        self.separator_header_import.grid(row=0, column=0, pady=(10, 0))
+        self.separator_header_export.grid(row=2, column=0, pady=(10, 0))
+        self.separator_menu_import.grid(row=1, column=0, sticky='we')
+        self.separator_menu_export.grid(row=3, column=0, sticky='we')
+        self.fill_value_header.grid(row=4, column=0, pady=(10, 0))
+        self.fill_value_entry.grid(row=5, column=0, sticky='we')
         self.icap_tq_radiobutton.grid(row=1, column=1, padx=10)
-        self.separator_header_export.grid(row=2, column=0, sticky='nw', pady=(20, 0), padx=6)
-        self.separator_menu_export.grid(row=3, column=0)
         self.header_instruments.grid(row=0, column=1, sticky='nw', pady=(10, 0), padx=30)
         self.agilent7900_radiobutton.grid(row=2, column=1, sticky='w', padx=10)

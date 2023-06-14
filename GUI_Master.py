@@ -174,13 +174,14 @@ class GUI:
         Collect the data from the logfile and samples files/folders and creates the managing experiment instance
         for the whole conversion.
         """
+        self.reset_progress()
         sample_rawdata_dictionary: dict = {}
         if self.widgets.data_type.get() == 'iCap TQ (Daisy)':
             for n, m in enumerate(self.list_of_files):
                 with open(m) as f:
                     # First 15 lines have to be skipped (in Qtegra files)
                     df: pd.DataFrame = pd.read_csv(filepath_or_buffer=f,
-                                                   sep=self.widgets.separator_import.get())
+                                                   sep=self.get_separator_import())
                 sample_rawdata_dictionary[f'{self.filename_list[n]}'] = df
 
         if self.widgets.data_type.get() == 'Agilent 7900':
@@ -195,7 +196,7 @@ class GUI:
                     if filename.endswith(".csv"):
                         with open(f'{m}/{filename}') as f:
                             df = pd.read_csv(filepath_or_buffer=f,
-                                             sep=self.widgets.separator_import.get(),
+                                             sep=self.get_separator_import(),
                                              skiprows=3,
                                              skipfooter=1,
                                              engine='python')
@@ -219,7 +220,8 @@ class GUI:
                                                      raw_laser_logfile_dataframe=logfile_dataframe,
                                                      sample_rawdata_dictionary=sample_rawdata_dictionary,
                                                      data_type=self.widgets.data_type.get(),
-                                                     logfile_filepath=self.logfile_filepath)
+                                                     logfile_filepath=self.logfile_filepath,
+                                                     fill_value=self.widgets.fill_value.get())
 
         self.experiment.build_rectangular_data()
 
@@ -228,6 +230,7 @@ class GUI:
         Collect the data from the logfile and creates the managing experiment instance
         for the patter duration file.
         """
+        self.reset_progress()
         try:
             with open(self.logfile_filepath) as f:
                 # pattern_dataframe = pd.read_csv(f, skipinitialspace=True).fillna('Faulty Line')
@@ -246,7 +249,8 @@ class GUI:
                                                      raw_laser_logfile_dataframe=logfile_dataframe,
                                                      sample_rawdata_dictionary={},
                                                      data_type=self.widgets.data_type.get(),
-                                                     logfile_filepath=self.logfile_filepath)
+                                                     logfile_filepath=self.logfile_filepath,
+                                                     fill_value=None)
 
         self.experiment.build_laser_ablation_times()
 
@@ -263,7 +267,27 @@ class GUI:
         """
         Give the separator for the exported files chosen by the user to a requesting instance.
         """
-        return self.widgets.separator_export.get()
+        separator_list = self.widgets.separator_export.get()
+        if separator_list == 'Tab':
+            separator = '\t'
+        elif separator_list == 'Space':
+            separator = ' '
+        else:
+            separator = separator_list
+        return separator
+
+    def get_separator_import(self):
+        """
+        Give the separator for the exported files chosen by the user to a requesting instance.
+        """
+        separator_list = self.widgets.separator_import.get()
+        if separator_list == 'Tab':
+            separator = '\t'
+        elif separator_list == 'Space':
+            separator = ' '
+        else:
+            separator = separator_list
+        return separator
 
     def get_export_path(self):
         """

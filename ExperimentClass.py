@@ -65,7 +65,7 @@ def get_dwell_times_from_rawdata(masses: list, dataframe: pd.DataFrame):
 
 class Experiment:
     def __init__(self, gui, raw_laser_logfile_dataframe: pd.DataFrame, sample_rawdata_dictionary: dict, data_type: str,
-                 logfile_filepath: str):
+                 logfile_filepath: str, fill_value):
         self.gui = gui
         self.raw_laser_logfile_dataframe: pd.DataFrame = raw_laser_logfile_dataframe
         self.sample_rawdata_dictionary: dict = sample_rawdata_dictionary
@@ -74,6 +74,7 @@ class Experiment:
         self.laserlog_object: Optional[LaserlogClass.Laserlog] = None
         self.RawdataSample_objects_dictionary: dict = {}
         self.logfile_filepath: str = logfile_filepath
+        self.fill_value = fill_value
 
     def build_laser_log_object(self):
 
@@ -135,7 +136,8 @@ class Experiment:
                                                                  name=sample_name,
                                                                  rawdata_dictionary=rawdata_extracted_masses_dictionary,
                                                                  dwelltime_dictionary=dwelltime_dictionary,
-                                                                 sample_number=f'Sample_{sample_counter}')
+                                                                 sample_number=f'Sample_{sample_counter}',
+                                                                 fill_value=self.fill_value)
                 sample_counter += 1
                 self.RawdataSample_objects_dictionary[sample_name] = rawdatasample
 
@@ -161,7 +163,8 @@ class Experiment:
                                                                  name=sample_name,
                                                                  rawdata_dictionary=rawdata_extracted_masses_dictionary,
                                                                  dwelltime_dictionary=dwelltime_dictionary,
-                                                                 sample_number=f'Sample_{sample_counter}')
+                                                                 sample_number=f'Sample_{sample_counter}',
+                                                                 fill_value=self.fill_value)
                 sample_counter += 1
                 self.RawdataSample_objects_dictionary[sample_name] = rawdatasample
 

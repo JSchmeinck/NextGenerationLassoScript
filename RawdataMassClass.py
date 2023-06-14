@@ -1,9 +1,6 @@
 from __future__ import annotations
-
 from typing import TYPE_CHECKING
-
 import numpy as np
-
 if TYPE_CHECKING:
     import RawdataSampleClass
 
@@ -12,7 +9,7 @@ import re
 
 
 class RawdataMass:
-    def __init__(self, sample: RawdataSampleClass.RawdataSample, rawdata_line_dictionary, dwelltime, mass):
+    def __init__(self, sample: RawdataSampleClass.RawdataSample, rawdata_line_dictionary, dwelltime, mass, fill_value):
         self.sample: RawdataSampleClass.RawdataSample = sample
         self.mass: str = mass
         self.dwelltime: dict = dwelltime
@@ -20,6 +17,7 @@ class RawdataMass:
         self.line_dictionary: dict = {}
         self.true_rawdata_dictionary: dict = {}
         self.maximum_line_length: int = 0
+        self.fill_value = fill_value
 
     def build_line_objects(self):
         for line, line_data in self.rawdata_line_dictionary.items():
@@ -36,14 +34,14 @@ class RawdataMass:
                 integer_value = int(line_number[0])
 
                 number_of_data_points_before = int((line_info[f'{line_info["lines included"][0]}_x_start'] - outer_dimensions_dictionary['x_min'])/space_per_datapoint)
-                zeros_array_before = np.zeros(number_of_data_points_before)
+                zeros_array_before = np.full(fill_value=str(self.fill_value), shape=number_of_data_points_before)
 
                 number_of_data_points_inside = int((line_info[f'{line_info["lines included"][0]}_x_end'] -
                                                     line_info[f'{line_info["lines included"][0]}_x_start'])/space_per_datapoint)
                 sample_data = self.rawdata_line_dictionary[f'Sample {integer_value}'][0:number_of_data_points_inside]
 
                 number_of_data_points_after = int((outer_dimensions_dictionary['x_max'] - line_info[f'{line_info["lines included"][0]}_x_end'])/space_per_datapoint)
-                zeros_array_after = np.zeros(number_of_data_points_after)
+                zeros_array_after = np.full(fill_value=str(self.fill_value), shape=number_of_data_points_after)
                 combined_true_line_array = np.concatenate((zeros_array_before, sample_data, zeros_array_after))
                 line_length = combined_true_line_array.size
                 if line_length > self.maximum_line_length:
@@ -75,14 +73,14 @@ class RawdataMass:
                 sample_value = integer_value
                 number_of_data_points_before = int((line_info[f'{line_info["lines included"][k]}_x_start'] -
                                                     outer_dimensions_dictionary['x_min']) / space_per_datapoint)
-                combined_array = np.zeros(number_of_data_points_before)
+                combined_array = np.full(fill_value=str(self.fill_value), shape=number_of_data_points_before)
                 number_of_data_points_inside = int((line_info[f'{line_info["lines included"][k]}_x_end'] -
                                                     line_info[
                                                         f'{line_info["lines included"][k]}_x_start']) / space_per_datapoint)
                 sample_data = self.rawdata_line_dictionary[f'Sample {integer_value}'][0:number_of_data_points_inside]
                 number_of_data_points_after = int((line_info[f'{line_info["lines included"][k+1]}_x_start'] -
                                                    line_info[f'{line_info["lines included"][k]}_x_end']) / space_per_datapoint)
-                zeros_array_after = np.zeros(number_of_data_points_after)
+                zeros_array_after = np.full(fill_value=str(self.fill_value), shape=number_of_data_points_after)
                 combined_array = np.concatenate((combined_array, sample_data, zeros_array_after))
             if 0 < k < amount_of_lines-1:
                 number_of_data_points_inside = int((line_info[f'{line_info["lines included"][k]}_x_end'] -
@@ -93,7 +91,7 @@ class RawdataMass:
                 number_of_data_points_after = int((line_info[f'{line_info["lines included"][k + 1]}_x_start'] -
                                                    line_info[
                                                        f'{line_info["lines included"][k]}_x_end']) / space_per_datapoint)
-                zeros_array_after = np.zeros(number_of_data_points_after)
+                zeros_array_after = np.full(fill_value=str(self.fill_value), shape=number_of_data_points_after)
                 combined_array = np.concatenate((combined_array, sample_data, zeros_array_after))
             if k == amount_of_lines-1:
                 number_of_data_points_inside = int((line_info[f'{line_info["lines included"][k]}_x_end'] -
@@ -102,6 +100,6 @@ class RawdataMass:
                 sample_data = self.rawdata_line_dictionary[f'Sample {integer_value}'][0:number_of_data_points_inside]
                 number_of_data_points_after = int((outer_dimensions_dictionary['x_max'] - line_info[
                     f'{line_info["lines included"][k]}_x_end']) / space_per_datapoint)
-                zeros_array_after = np.zeros(number_of_data_points_after)
+                zeros_array_after = np.full(fill_value=str(self.fill_value), shape=number_of_data_points_after)
                 combined_array = np.concatenate((combined_array, sample_data, zeros_array_after))
         return combined_array, sample_value
