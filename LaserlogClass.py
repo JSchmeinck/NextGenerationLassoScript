@@ -83,7 +83,7 @@ class Laserlog:
             line_duration_array = np.full(fill_value='Line Duration', shape=1)
             sample_line_lengh_dictionary[sample] = {}
             scan_speed = instance.get_scan_speed()
-            raw_line_dictionary = instance.get_true_line_information_dictionary()
+            raw_line_dictionary = instance.get_true_line_information_dictionary(line_pattern_sheet=True)
             for line, line_info in raw_line_dictionary.items():
 
                 sample_line_lenghts_um = int((line_info[f'{line_info["lines included"][0]}_x_end'] -

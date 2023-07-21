@@ -39,10 +39,13 @@ class Sampleinlog:
         duplicated_indices = duplicated_indices[duplicated_indices.apply(lambda x: len(x) > 1)]
         return duplicated_indices
 
-    def build_true_line_information_dictionary(self):
+    def build_true_line_information_dictionary(self, line_pattern_sheet):
         self.find_outer_dimensions_of_sample()
         self.find_scan_speed_of_sample()
-        duplicated_indices_series = self.get_series_of_duplicate_lines()
+        if line_pattern_sheet is False:
+            duplicated_indices_series = self.get_series_of_duplicate_lines()
+        else:
+            duplicated_indices_series = pd.Series([])
         true_line_information_dictionary = {}
         line = 1
         for idx, row in self.logfile_slice.iterrows():
@@ -77,8 +80,8 @@ class Sampleinlog:
 
         return true_line_information_dictionary
 
-    def get_true_line_information_dictionary(self):
-        true_line_information_dictionary = self.build_true_line_information_dictionary()
+    def get_true_line_information_dictionary(self, line_pattern_sheet=False):
+        true_line_information_dictionary = self.build_true_line_information_dictionary(line_pattern_sheet)
         return true_line_information_dictionary
 
     def get_raw_line_information_dictionary(self):
