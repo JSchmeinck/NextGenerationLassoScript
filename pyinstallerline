@@ -1,0 +1,1 @@
+ pyinstaller --hidden-import xlsxwriter --onefile --icon=lassoimage.ico main.py
