@@ -209,7 +209,9 @@ class Experiment:
                                message='The rectangular rawdata Files have been successfully created.')
 
     def build_laser_ablation_times(self):
+        # Step 1
         self.build_laser_log_object()
+        # Step 2
         state_log = self.laserlog_object.build_sampleinlog_objects()
         if state_log is False:
             popup_error_message(title='Logfile Error',
@@ -217,6 +219,7 @@ class Experiment:
                                         'pattern being completed by end statement')
             self.gui.reset_progress()
             return
+        # Step 3
         state = self.laserlog_object.build_laser_pattern_duration_sheet()
         if state is False:
             popup_error_message(title='Export Path Error',

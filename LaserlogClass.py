@@ -84,6 +84,9 @@ class Laserlog:
             sample_line_lengh_dictionary[sample] = {}
             scan_speed = instance.get_scan_speed()
             raw_line_dictionary = instance.get_true_line_information_dictionary(line_pattern_sheet=True)
+            if raw_line_dictionary is False:
+                self.send_error_message(title='LogFile Error', message='Not able to match row in the laser logfile'
+                                                                       ' to an ablation line')
             for line, line_info in raw_line_dictionary.items():
 
                 sample_line_lenghts_um = int((line_info[f'{line_info["lines included"][0]}_x_end'] -
