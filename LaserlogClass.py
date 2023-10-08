@@ -16,6 +16,10 @@ class Laserlog:
         df = self.clean_laserlog_dataframe
         sample_chunks_dictionary: dict = {}
 
+        if self.experiment.synchronized:
+            sample_chunks_dictionary[f'Sample_1'] = df
+            return sample_chunks_dictionary
+
         # Initialize variables
         start_idx = None
         chunk_counter = 1
@@ -49,6 +53,7 @@ class Laserlog:
 
                     # Reset start and end indices
                     start_idx = None
+
         return sample_chunks_dictionary
 
     def build_sampleinlog_objects(self):

@@ -65,7 +65,7 @@ def get_dwell_times_from_rawdata(masses: list, dataframe: pd.DataFrame):
 
 class Experiment:
     def __init__(self, gui, raw_laser_logfile_dataframe: pd.DataFrame, sample_rawdata_dictionary: dict, data_type: str,
-                 logfile_filepath: str, fill_value):
+                 logfile_filepath: str, fill_value, synchronized: bool):
         self.gui = gui
         self.raw_laser_logfile_dataframe: pd.DataFrame = raw_laser_logfile_dataframe
         self.sample_rawdata_dictionary: dict = sample_rawdata_dictionary
@@ -75,6 +75,7 @@ class Experiment:
         self.RawdataSample_objects_dictionary: dict = {}
         self.logfile_filepath: str = logfile_filepath
         self.fill_value = fill_value
+        self.synchronized = synchronized
 
     def build_laser_log_object(self):
 
@@ -97,7 +98,51 @@ class Experiment:
 
     def build_rawdatasample_objects(self):
         sample_counter = 1
-        if self.data_type == 'iCap TQ (Daisy)':
+        if self.synchronized:
+            for sample_name, sample_rawdata_dataframe in self.sample_rawdata_dictionary.items():
+                rawdata_extracted_masses_dictionary = {}
+                dwelltime_dictionary = {}
+                synchronized_data, list_of_unique_masses_in_file, time_data_sample = self.gui.synchronizer.get_data()
+                if self.data_type == 'iCap TQ (Daisy)':
+                    for index, mass in enumerate(list_of_unique_masses_in_file):
+                        indiviual_dwelltime = (time_data_sample[1]-time_data_sample[0])/len(list_of_unique_masses_in_file)
+                        dwelltime_dictionary[mass] = indiviual_dwelltime * (index+1)
+                if self.data_type == 'EIC':
+                    for index, mass in enumerate(list_of_unique_masses_in_file):
+                        dwelltime_dictionary[mass] = time_data_sample[1]-time_data_sample[0]
+                dwelltime_dictionary['Cycle'] = time_data_sample[1]-time_data_sample[0]
+                list_of_col_names = []
+                for k, i in enumerate(list_of_unique_masses_in_file):
+                    extracted_sample_column_dictionary = {}
+                    # Iterate over the columns
+                    for col in synchronized_data.columns:
+                        if col != 'Unnamed: 2':
+                            if k == 0:
+                                list_of_col_names.append(col)
+                            filtered_values = synchronized_data[synchronized_data['Unnamed: 2'] == i][col].values
+
+                            # Convert the result to a NumPy array
+                            extracted_values = np.array(filtered_values)
+
+                            # Filter out non-numeric values (strings, NaNs, etc.)
+                            extracted_values = extracted_values[~np.isnan(extracted_values)]
+                            # Convert the filtered values to a NumPy array
+                            extracted_array = extracted_values.astype(float)
+                            # Add the extracted array to the dictionary
+
+                            extracted_sample_column_dictionary[col] = extracted_array
+                            extracted_array = 0
+                    rawdata_extracted_masses_dictionary[i] = extracted_sample_column_dictionary
+                rawdatasample = RawdataSampleClass.RawdataSample(experiment=self,
+                                                                 name=sample_name,
+                                                                 rawdata_dictionary=rawdata_extracted_masses_dictionary,
+                                                                 dwelltime_dictionary=dwelltime_dictionary,
+                                                                 sample_number=f'Sample_{sample_counter}',
+                                                                 fill_value=self.fill_value,
+                                                                 column_names=list_of_col_names)
+                self.RawdataSample_objects_dictionary[sample_name] = rawdatasample
+
+        elif self.data_type == 'iCap TQ (Daisy)':
             for sample_name, sample_rawdata_dataframe in self.sample_rawdata_dictionary.items():
                 rawdata_extracted_masses_dictionary = {}
                 mass_options: np.ndarray = sample_rawdata_dataframe['Unnamed: 2'].unique()
@@ -107,11 +152,14 @@ class Experiment:
                 dwelltime_dictionary = get_dwell_times_from_rawdata(masses=mass_options_list,
                                                                     dataframe=sample_rawdata_dataframe)
 
+                list_of_col_names = []
                 for k, i in enumerate(mass_options_list):
                     extracted_sample_column_dictionary = {}
                     # Iterate over the columns
                     for col in sample_rawdata_dataframe.columns:
                         if col.startswith('Sample'):
+                            if k == 0:
+                                list_of_col_names.append(col)
                             sample_col = sample_rawdata_dataframe[col]
                             identifier_col_2 = sample_rawdata_dataframe['Unnamed: 2']
                             identifier_col_3 = sample_rawdata_dataframe['Unnamed: 3']
@@ -137,11 +185,12 @@ class Experiment:
                                                                  rawdata_dictionary=rawdata_extracted_masses_dictionary,
                                                                  dwelltime_dictionary=dwelltime_dictionary,
                                                                  sample_number=f'Sample_{sample_counter}',
-                                                                 fill_value=self.fill_value)
+                                                                 fill_value=self.fill_value,
+                                                                 column_names=list_of_col_names)
                 sample_counter += 1
                 self.RawdataSample_objects_dictionary[sample_name] = rawdatasample
 
-        if self.data_type == 'Agilent 7900':
+        elif self.data_type == 'Agilent 7900':
             rawdata_extracted_masses_dictionary = {}
             for sample_name, sample_rawdata_dictionary in self.sample_rawdata_dictionary.items():
                 dwelltime_dictionary = {}
@@ -166,7 +215,7 @@ class Experiment:
                                                                  sample_number=f'Sample_{sample_counter}',
                                                                  fill_value=self.fill_value)
                 sample_counter += 1
-                self.RawdataSample_objects_dictionary[sample_name] = rawdatasample
+            self.RawdataSample_objects_dictionary[sample_name] = rawdatasample
 
     def pass_sample_logfile_information(self, sample_number: str):
         return self.laserlog_object.get_log_information_of_rawdata_sample(sample_number)

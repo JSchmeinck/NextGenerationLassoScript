@@ -5,7 +5,7 @@ import SampleinlogClass
 
 
 class RawdataSample:
-    def __init__(self, experiment, rawdata_dictionary, dwelltime_dictionary, name, sample_number, fill_value):
+    def __init__(self, experiment, rawdata_dictionary, dwelltime_dictionary, name, sample_number, fill_value, column_names):
         self.experiment = experiment
         self.name = name
         self.sample_number = sample_number
@@ -18,6 +18,7 @@ class RawdataSample:
         self.amount_of_lines = 0
         self.fill_value = fill_value
         self.sample_in_log: Optional[SampleinlogClass.Sampleinlog] = None
+        self.list_of_column_names: list = column_names
 
     def build_rawdatamass_objects(self):
         k = 0
@@ -26,7 +27,8 @@ class RawdataSample:
                                                        mass=mass,
                                                        dwelltime=self.dwelltime_dictionary[mass],
                                                        sample=self,
-                                                       fill_value=self.fill_value)
+                                                       fill_value=self.fill_value,
+                                                       column_names=self.list_of_column_names)
             self.RawdataMass_objects_dictionary[mass] = rawdatamass
             if k == 0:
                 self.amount_of_lines = len(rawdata_line_dictionary)

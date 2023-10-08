@@ -9,7 +9,7 @@ import re
 
 
 class RawdataMass:
-    def __init__(self, sample: RawdataSampleClass.RawdataSample, rawdata_line_dictionary, dwelltime, mass, fill_value):
+    def __init__(self, sample: RawdataSampleClass.RawdataSample, rawdata_line_dictionary, dwelltime, mass, fill_value, column_names):
         self.sample: RawdataSampleClass.RawdataSample = sample
         self.mass: str = mass
         self.dwelltime: dict = dwelltime
@@ -18,6 +18,7 @@ class RawdataMass:
         self.true_rawdata_dictionary: dict = {}
         self.maximum_line_length: int = 0
         self.fill_value = fill_value
+        self.list_of_column_names: list = column_names
 
     def build_line_objects(self):
         for line, line_data in self.rawdata_line_dictionary.items():
@@ -38,7 +39,7 @@ class RawdataMass:
 
                 number_of_data_points_inside = int((line_info[f'{line_info["lines included"][0]}_x_end'] -
                                                     line_info[f'{line_info["lines included"][0]}_x_start'])/space_per_datapoint)
-                sample_data = self.rawdata_line_dictionary[f'Sample {integer_value}'][0:number_of_data_points_inside]
+                sample_data = self.rawdata_line_dictionary[f'{self.list_of_column_names[integer_value-1]}'][0:number_of_data_points_inside]
 
                 number_of_data_points_after = int((outer_dimensions_dictionary['x_max'] - line_info[f'{line_info["lines included"][0]}_x_end'])/space_per_datapoint)
                 zeros_array_after = np.full(fill_value=str(self.fill_value), shape=number_of_data_points_after)
@@ -77,7 +78,7 @@ class RawdataMass:
                 number_of_data_points_inside = int((line_info[f'{line_info["lines included"][k]}_x_end'] -
                                                     line_info[
                                                         f'{line_info["lines included"][k]}_x_start']) / space_per_datapoint)
-                sample_data = self.rawdata_line_dictionary[f'Sample {integer_value}'][0:number_of_data_points_inside]
+                sample_data = self.rawdata_line_dictionary[f'{self.list_of_column_names[integer_value-1]}'][0:number_of_data_points_inside]
                 number_of_data_points_after = int((line_info[f'{line_info["lines included"][k+1]}_x_start'] -
                                                    line_info[f'{line_info["lines included"][k]}_x_end']) / space_per_datapoint)
                 zeros_array_after = np.full(fill_value=str(self.fill_value), shape=number_of_data_points_after)
@@ -86,7 +87,7 @@ class RawdataMass:
                 number_of_data_points_inside = int((line_info[f'{line_info["lines included"][k]}_x_end'] -
                                                     line_info[
                                                         f'{line_info["lines included"][k]}_x_start']) / space_per_datapoint)
-                sample_data = self.rawdata_line_dictionary[f'Sample {integer_value}'][0:number_of_data_points_inside]
+                sample_data = self.rawdata_line_dictionary[f'{self.list_of_column_names[integer_value-1]}'][0:number_of_data_points_inside]
 
                 number_of_data_points_after = int((line_info[f'{line_info["lines included"][k + 1]}_x_start'] -
                                                    line_info[
@@ -97,7 +98,7 @@ class RawdataMass:
                 number_of_data_points_inside = int((line_info[f'{line_info["lines included"][k]}_x_end'] -
                                                     line_info[
                                                         f'{line_info["lines included"][k]}_x_start']) / space_per_datapoint)
-                sample_data = self.rawdata_line_dictionary[f'Sample {integer_value}'][0:number_of_data_points_inside]
+                sample_data = self.rawdata_line_dictionary[f'{self.list_of_column_names[integer_value-1]}'][0:number_of_data_points_inside]
                 number_of_data_points_after = int((outer_dimensions_dictionary['x_max'] - line_info[
                     f'{line_info["lines included"][k]}_x_end']) / space_per_datapoint)
                 zeros_array_after = np.full(fill_value=str(self.fill_value), shape=number_of_data_points_after)

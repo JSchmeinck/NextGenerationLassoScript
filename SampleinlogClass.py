@@ -77,7 +77,7 @@ class Sampleinlog:
                     f'line_{str(int(line_counter / 2))}_x_start'] = row['X(um)']
                 # The end value of x of the line is added by looking at the x value of the next row in the logfile
                 true_line_information_dictionary[f'line_{str(line)}'][
-                    f'line_{str(int(line))}_x_end'] = self.logfile_slice.loc[row + 1, 'X(um)']
+                    f'line_{str(int(line))}_x_end'] = self.logfile_slice.loc[idx + 1, 'X(um)']
                 # The y value of the line is added
                 true_line_information_dictionary[f'line_{str(line)}']['y_value'] = row['Y(um)']
 
