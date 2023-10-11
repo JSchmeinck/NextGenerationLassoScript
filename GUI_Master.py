@@ -7,6 +7,8 @@ import ExperimentClass
 import GUI_Widgets
 import Image_Synchronization
 from tkinter import messagebox
+import Importer
+import Logfile_Viewer
 
 
 class GUI:
@@ -16,6 +18,9 @@ class GUI:
         self.master_window.title("Lasso Script")
         self.master_window.geometry('900x550')
         self.master_window.resizable(width=False, height=False)
+
+        self.importer = Importer.Importer(gui=self)
+        self.logfile_viewer = Logfile_Viewer.LogfileViewer(gui=self, master_window=master_window)
 
         self.widgets = GUI_Widgets.GUIWidgets(gui_master=self,
                                               master_window=master_window)
@@ -34,6 +39,9 @@ class GUI:
 
         self.synchronizer = Image_Synchronization.ImageSynchronizer(master_gui=self, master_window=self.master_window)
         self.data_is_synchronized = False
+
+
+
 
     def grid_gui_widgets(self):
         self.widgets.grid_gui_widgets()
@@ -149,11 +157,13 @@ class GUI:
 
     def change_of_synchronization_mode(self):
         if self.widgets.synchronization.get():
+            self.widgets.view_logfile_button.configure(state='active')
             self.widgets.button_synchronization.configure(state='active')
             if self.widgets.data_type.get() == 'iCap TQ (Daisy)':
                 self.widgets.separator_import.set(',')
         else:
             self.widgets.button_synchronization.configure(state='disabled')
+            self.widgets.view_logfile_button.configure(state='disabled')
 
     def moveup(self):
         """
@@ -198,151 +208,13 @@ class GUI:
 
         synchronized = self.synchronization_query()
 
-        sample_rawdata_dictionary: dict = {}
-        if self.widgets.data_type.get() == 'iCap TQ (Daisy)':
-            for n, m in enumerate(self.list_of_files):
-                if synchronized:
-                    with open(m) as f:
-                        # First 15 lines have to be skipped (in Qtegra files)
-                        df: pd.DataFrame = pd.read_csv(filepath_or_buffer=f,
-                                                       sep=self.get_separator_import(),
-                                                       skiprows=13)
-                    sample_rawdata_dictionary[f'{self.filename_list[n]}'] = df
-                    break
-                else:
-                    with open(m) as f:
-                        # First 15 lines have to be skipped (in Qtegra files)
-                        df: pd.DataFrame = pd.read_csv(filepath_or_buffer=f,
-                                                       sep=self.get_separator_import())
-                    sample_rawdata_dictionary[f'{self.filename_list[n]}'] = df
+        sample_rawdata_dictionary = self.importer.import_sample_file(data_type=self.widgets.data_type.get(),
+                                                                     synchronized=synchronized)
 
-        if self.widgets.data_type.get() == 'Agilent 7900':
-            individual_lines_dictionary = {}
-            # Loop through the imported directorys one by one
-            for n, m in enumerate(self.list_of_files):
-                directory = os.fsencode(m)
-                # Loop trough the files inside the directory
-                for ticker, file in enumerate(os.listdir(directory)):
-                    filename = os.fsdecode(file)
-                    # Only use the files that are csv data
-                    if filename.endswith(".csv"):
-                        with open(f'{m}/{filename}') as f:
-                            df = pd.read_csv(filepath_or_buffer=f,
-                                             sep=self.get_separator_import(),
-                                             skiprows=3,
-                                             skipfooter=1,
-                                             engine='python')
-                        individual_lines_dictionary[f'Line_{ticker + 1}'] = df
-                sample_rawdata_dictionary[f'{self.filename_list[n]}'] = individual_lines_dictionary
-        if self.widgets.data_type.get() == 'EIC':
-            for n, m in enumerate(self.list_of_files):
-                with open(m) as f:
-                    df: pd.DataFrame = pd.read_csv(f, sep=self.get_separator_import(), skiprows=2, engine='python')
-                df.drop(columns=[df.columns[-1]], inplace=True)
-                sample_rawdata_dictionary[f'{self.filename_list[n]}'] = df
-
-
-        if self.widgets.laser_type.get() == 'Cetac G2+':
-            with open(self.logfile_filepath) as file:
-                iolite_dataframe = pd.read_csv(file, skiprows=1, header=None)
-            iolite_dataframe.columns = ['Timestamp', 'Sequence Number', 'SubPoint Number', 'Vertex Number', 'Comment',
-                                         'X(um)', 'Y(um)', 'Intended X(um)', 'Intended Y(um)', 'Scan Velocity (um/s)',
-                                         'Laser State', 'Laser Rep. Rate (Hz)', 'Spot Type', 'Spot Size (um)',
-                                         'Spot Type', 'Spot Size', 'Spot Angle', 'MFC1', 'MFC2']
-            logfile_dictionary = {}
-
-            scan_speed_array = iolite_dataframe['Scan Velocity (um/s)'].dropna().values
-            scan_speed_array[1::2] = np.nan
-
-            pattern_number_array = iolite_dataframe['Sequence Number'].dropna().values
-            pattern_number_array = pattern_number_array.repeat(2)
-            run_queue_order_array = pattern_number_array.copy()
-            pattern_number_array[1::2] = np.nan
-
-            run_queue_order_array = run_queue_order_array-1
-            run_queue_order_array[1::2] = np.nan
-
-            name_array = iolite_dataframe['Comment'].dropna().values
-            name_array = name_array.repeat(2)
-            name_array[1::2] = np.nan
-
-            type_array = iolite_dataframe['Spot Type'].to_numpy()
-            type_array = type_array[:, 0]
-            type_array = type_array[0::7]
-            type_array = type_array.repeat(2)
-            type_array[1::2] = np.nan
-
-            x_array = iolite_dataframe['Intended X(um)'].dropna().values
-            y_array = iolite_dataframe['Intended Y(um)'].dropna().values
-
-            logfile_dictionary['Pattern #'] = pattern_number_array
-            logfile_dictionary['Name'] = name_array
-            logfile_dictionary['Type'] = type_array
-            logfile_dictionary['Run Queue Order'] = run_queue_order_array
-            logfile_dictionary['Scan Speed(Î¼m/sec)'] = scan_speed_array
-            logfile_dictionary['X(um)'] = x_array
-            logfile_dictionary['Y(um)'] = y_array
-
-            logfile_dataframe = pd.DataFrame(logfile_dictionary)
-
-        if self.widgets.laser_type.get() == 'ImageBIO 266':
-            if synchronized:
-                with open(self.logfile_filepath) as file:
-                    iolite_dataframe = pd.read_csv(file, skiprows=1, header=None)
-                iolite_dataframe.columns = ['Timestamp', 'Sequence Number', 'SubPoint Number', 'Vertex Number',
-                                             'Comment',
-                                             'X(um)', 'Y(um)', 'Intended X(um)', 'Intended Y(um)',
-                                             'Scan Velocity (um/s)',
-                                             'Laser State', 'Laser Rep. Rate (Hz)', 'Spot Type', 'Spot Size (um)']
-
-                logfile_dictionary = {}
-
-                scan_speed_array = iolite_dataframe['Scan Velocity (um/s)'].dropna().values
-                scan_speed_array[1::2] = np.nan
-
-                pattern_number_array = iolite_dataframe['Sequence Number'].dropna().values
-                pattern_number_array = pattern_number_array.repeat(2)
-                run_queue_order_array = pattern_number_array.copy()
-                pattern_number_array[1::2] = np.nan
-
-                run_queue_order_array = run_queue_order_array - 1
-                run_queue_order_array[1::2] = np.nan
-
-                name_array = iolite_dataframe['Comment'].dropna().values
-                name_array = name_array.repeat(2)
-                name_array[1::2] = np.nan
-
-                type_array = iolite_dataframe['Laser State'].to_numpy()
-                type_array = type_array[0::6]
-                type_array = type_array.repeat(2)
-                type_array[1::2] = np.nan
-
-                x_array = iolite_dataframe['Intended X(um)'].dropna().values
-                y_array = iolite_dataframe['Intended Y(um)'].dropna().values
-
-                logfile_dictionary['Pattern #'] = pattern_number_array
-                logfile_dictionary['Name'] = name_array
-                logfile_dictionary['Type'] = type_array
-                logfile_dictionary['Run Queue Order'] = run_queue_order_array
-                logfile_dictionary['Scan Speed(Î¼m/sec)'] = scan_speed_array
-                logfile_dictionary['X(um)'] = x_array
-                logfile_dictionary['Y(um)'] = y_array
-
-                logfile_dataframe = pd.DataFrame(logfile_dictionary)
-
-            else:
-                try:
-                    with open(self.logfile_filepath) as f:
-                        # pattern_dataframe = pd.read_csv(f, skipinitialspace=True).fillna('Faulty Line')
-
-                        logfile_dataframe = pd.read_csv(f, usecols=['Pattern #', 'Name', 'Type', 'Run Queue Order',
-                                                                    'Grid Spacing(Î¼m)', 'Scan Speed(Î¼m/sec)', 'X(um)',
-                                                                    'Y(um)'], index_col=False)
-                except:
-                    with open(self.logfile_filepath) as f:
-                        logfile_dataframe = pd.read_csv(f, usecols=['ï»¿Pattern #', 'Name', 'Type', 'Run Queue Order',
-                                                                    'Grid Spacing(Î¼m)', 'Scan Speed(Î¼m/sec)', 'X(um)',
-                                                                    'Y(um)'], index_col=False)
+        logfile_dataframe = self.importer.import_laser_logfile(logfile=self.logfile_filepath,
+                                                               laser_type=self.widgets.laser_type.get(),
+                                                               iolite_file=synchronized,
+                                                               rectangular_data_calculation=True)
 
         self.experiment = ExperimentClass.Experiment(gui=self,
                                                      raw_laser_logfile_dataframe=logfile_dataframe,
@@ -360,19 +232,10 @@ class GUI:
         for the patter duration file.
         """
         self.reset_progress()
-        try:
-            with open(self.logfile_filepath) as f:
-                # pattern_dataframe = pd.read_csv(f, skipinitialspace=True).fillna('Faulty Line')
-
-                logfile_dataframe = pd.read_csv(f, usecols=['Pattern #', 'Name', 'Type', 'Run Queue Order',
-                                                            'Grid Spacing(Î¼m)', 'Scan Speed(Î¼m/sec)', 'X(um)',
-                                                            'Y(um)'], index_col=False)
-
-        except:
-            with open(self.logfile_filepath) as f:
-                logfile_dataframe = pd.read_csv(f, usecols=['ï»¿Pattern #', 'Name', 'Type', 'Run Queue Order',
-                                                            'Grid Spacing(Î¼m)', 'Scan Speed(Î¼m/sec)', 'X(um)',
-                                                            'Y(um)'], index_col=False)
+        logfile_dataframe = self.importer.import_laser_logfile(logfile=self.logfile_filepath,
+                                                               laser_type='ImageBIO 266',
+                                                               iolite_file=False,
+                                                               rectangular_data_calculation=True)
 
         self.experiment = ExperimentClass.Experiment(gui=self,
                                                      raw_laser_logfile_dataframe=logfile_dataframe,

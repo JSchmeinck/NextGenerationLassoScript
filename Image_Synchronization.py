@@ -574,29 +574,16 @@ class ImageSynchronizer:
             intensity_data_sample = eic_rawdata_dataframe_without_time['TIC'].to_numpy()
 
         logfile = self.gui.logfile_filepath
-        if laser == 'ImageBIO 266':
-            with open(logfile) as file:
-                logfile_dataframe = pd.read_csv(file, skiprows=1, header=None)
-            logfile_dataframe.columns = ['Timestamp', 'Sequence Number', 'SubPoint Number', 'Vertex Number', 'Comment',
-                                         'X(um)', 'Y(um)', 'Intended X(um)', 'Intended Y(um)', 'Scan Velocity (um/s)',
-                                         'Laser State', 'Laser Rep. Rate (Hz)', 'Spot Type', 'Spot Size (um)']
-            masked_array, inverted_mask, time_array, self.clean_time_array = mask_array(main_array=logfile_dataframe['Y(um)'].to_numpy(),
-                                                     mask_array=logfile_dataframe['Intended X(um)'].to_numpy(),
-                                                     on_value=(sum.max()) * 1.2,
-                                                     timestamp_array=logfile_dataframe['Timestamp'].to_numpy())
+        logfile_dataframe = self.gui.importer.import_laser_logfile(logfile=logfile,
+                                                               laser_type=laser,
+                                                               iolite_file=True,
+                                                               rectangular_data_calculation=False)
 
-        if laser == 'Cetac G2+':
-            with open(logfile) as file:
-                logfile_dataframe = pd.read_csv(file, skiprows=1, header=None)
-            logfile_dataframe.columns = ['Timestamp', 'Sequence Number', 'SubPoint Number', 'Vertex Number', 'Comment',
-                                         'X(um)', 'Y(um)', 'Intended X(um)', 'Intended Y(um)', 'Scan Velocity (um/s)',
-                                         'Laser State', 'Laser Rep. Rate (Hz)', 'Spot Type', 'Spot Size (um)',
-                                         'Spot Type', 'Spot Size', 'Spot Angle', 'MFC1', 'MFC2']
-
-            masked_array, inverted_mask, time_array, self.clean_time_array = mask_array(main_array=logfile_dataframe['Y(um)'].to_numpy(),
-                                                     mask_array=logfile_dataframe['Intended X(um)'].to_numpy(),
-                                                     on_value=(sum.max()) * 1.2,
-                                                    timestamp_array=logfile_dataframe['Timestamp'].to_numpy())
+        masked_array, inverted_mask, time_array, self.clean_time_array = mask_array(
+            main_array=logfile_dataframe['Y(um)'].to_numpy(),
+            mask_array=logfile_dataframe['Intended X(um)'].to_numpy(),
+            on_value=(sum.max()) * 1.2,
+            timestamp_array=logfile_dataframe['Timestamp'].to_numpy())
 
 
         self.import_separator = import_separator

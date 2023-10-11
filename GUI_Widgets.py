@@ -162,7 +162,7 @@ class GUIWidgets:
 
         #The Synchronization menu
         self.synchronization_frame = ttk.Frame(master=self.master_window,
-                                               width=120,
+                                               width=200,
                                                height=100)
         self.header_synchronization = ttk.Label(master=self.synchronization_frame,
                                                 text='Data Synchronization',
@@ -177,6 +177,10 @@ class GUIWidgets:
         self.button_synchronization = ttk.Button(master=self.synchronization_frame,
                                                  text='Synchronize',
                                                  command=self.gui_master.synchronize_data,
+                                                 state='disabled')
+        self.view_logfile_button = ttk.Button(master=self.synchronization_frame,
+                                                 text='View Logfile',
+                                                 command=self.gui_master.logfile_viewer.show_logfile,
                                                  state='disabled')
 
     def grid_gui_widgets(self):
@@ -227,3 +231,4 @@ class GUIWidgets:
         self.header_synchronization.grid(row=0, column=1, sticky='n', pady=(10, 0))
         self.checkbutton_synchronization.grid(row=1, column=1, sticky='w')
         self.button_synchronization.grid(row=2, column=1)
+        self.view_logfile_button.grid(row=2, column=2)
