@@ -162,7 +162,7 @@ class GUIWidgets:
 
         #The Synchronization menu
         self.synchronization_frame = ttk.Frame(master=self.master_window,
-                                               width=200,
+                                               width=250,
                                                height=100)
         self.header_synchronization = ttk.Label(master=self.synchronization_frame,
                                                 text='Data Synchronization',
@@ -174,6 +174,14 @@ class GUIWidgets:
                                                            offvalue=False,
                                                            variable=self.synchronization,
                                                            command=self.gui_master.change_of_synchronization_mode)
+        self.multiple_samples = tk.BooleanVar(value=False)
+        self.checkbutton_multiple_samples = ttk.Checkbutton(master=self.synchronization_frame,
+                                                           text='Multiple Samples',
+                                                           onvalue=True,
+                                                           offvalue=False,
+                                                           variable=self.multiple_samples,
+                                                           command=self.gui_master.change_of_synchronization_mode,
+                                                            state='disabled')
         self.button_synchronization = ttk.Button(master=self.synchronization_frame,
                                                  text='Synchronize',
                                                  command=self.gui_master.synchronize_data,
@@ -230,5 +238,6 @@ class GUIWidgets:
         self.synchronization_frame.grid_propagate(False)
         self.header_synchronization.grid(row=0, column=1, sticky='n', pady=(10, 0))
         self.checkbutton_synchronization.grid(row=1, column=1, sticky='w')
+        self.checkbutton_multiple_samples.grid(row=1, column=2, sticky='w')
         self.button_synchronization.grid(row=2, column=1)
         self.view_logfile_button.grid(row=2, column=2)
