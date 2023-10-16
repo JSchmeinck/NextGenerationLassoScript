@@ -68,6 +68,7 @@ class ImageSynchronizer:
         self.window = tk.Toplevel(master=master_window)
         self.window.title("Image Synchronization")
         self.window.geometry('750x600')
+        self.window.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.window.resizable(width=False, height=False)
         self.window.withdraw()
 
@@ -114,7 +115,7 @@ class ImageSynchronizer:
         self.move_left_button = ttk.Button(master=self.peripheral_frame,
                                            text='Move Left',
                                            command=lambda: self.move_laser_log_time(direction='left'))
-        self.move_left_button.grid(row=0, column=0)
+        self.move_left_button.grid(row=0, column=0, sticky='e')
         self.move_increment = tk.DoubleVar(value=1.0)
         self.move_increment_entry = ttk.Entry(master=self.peripheral_frame,
                                               textvariable=self.move_increment,
@@ -173,6 +174,14 @@ class ImageSynchronizer:
                                               state=tk.DISABLED)
         self.current_extension_entry.grid(row=1, column=5, padx=20)
 
+        self.checkbutton_multiple_samples = ttk.Checkbutton(master=self.peripheral_frame,
+                                                            text='Multiple Samples',
+                                                            onvalue=True,
+                                                            offvalue=False,
+                                                            variable=self.gui.widgets.multiple_samples,
+                                                            command=self.gui.change_of_synchronization_mode)
+        self.checkbutton_multiple_samples.grid(row=2, column=0, padx=20, columnspan=2)
+
         self.laser_log_plot = None
         self.raw_data_plot = None
         self.canvas = None
@@ -180,6 +189,11 @@ class ImageSynchronizer:
         self.dragging_xaxis = False
 
         self.multi_import = False
+
+        self.sample_data_dictionary = {}
+
+    def on_closing(self):
+        self.window.withdraw()
 
     def set_laser_logfile(self, logfile):
         self.laser_logfile = logfile
@@ -395,14 +409,16 @@ class ImageSynchronizer:
         self.toggle_window_visivility()
         self.current_offset.set(f'0 s')
 
-        self.calculate_samples()
+        if self.gui.widgets.multiple_samples.get():
+            self.calculate_samples_multiple_samples()
+        else:
+            self.calculate_samples()
 
         self.gui.data_is_synchronized = True
 
-
     def calculate_samples(self):
+        self.sample_data_dictionary = {}
         self.indices_dictionary = {}
-
 
         time_windows_arr = self.clean_time_array_extended - self.laser_log_time_offset
         df = self.sample_rawdata
@@ -487,7 +503,104 @@ class ImageSynchronizer:
                 mass_name_array = np.concatenate((mass_name_array, filler))
         result_df.insert(0, 'Unnamed: 2', mass_name_array)
 
-        self.synchronized_data = result_df
+        self.sample_data_dictionary[self.gui.filename_list[0]] = result_df
+
+    def calculate_samples_multiple_samples(self):
+        self.sample_data_dictionary = {}
+        indices_dictionary = {}
+
+
+        logfile_dataframe = self.gui.importer.import_laser_logfile(logfile=self.gui.logfile_filepath,
+                                                                   laser_type=self.gui.widgets.laser_type.get(),
+                                                                   iolite_file=True,
+                                                                   rectangular_data_calculation=True,
+                                                                   logfile_viewer=True)
+        logfile, sample_overview_dictionary = self.gui.logfile_viewer.divide_samples(logfile=logfile_dataframe,
+                                                                            sample_overview=True)
+        df = self.sample_rawdata
+        for sample, infos in sample_overview_dictionary.items():
+            indices_of_samples = np.array(infos['idx_List'])
+            indices_of_samples = indices_of_samples.repeat(2)
+            indices_of_samples[1::2] = indices_of_samples[1::2]+1
+
+            sample_names_arr = infos['Names']
+
+            num_columns = df.shape[1]-1
+            list_of_column_names = list(df.columns.values)
+
+            time_windows_arr = self.clean_time_array_extended - self.laser_log_time_offset
+            time_windows_arr = time_windows_arr[indices_of_samples[0]:indices_of_samples[-1]+1]
+
+
+            # Create an empty dictionary to hold the data for each sample
+            samples_data = {}
+
+            # Create an empty list to hold the column names for each row
+            column_names_list = []
+
+            # Iterate through the time windows and sample names
+            for i in range(0, len(time_windows_arr), 2):
+                start_time = time_windows_arr[i]
+                end_time = time_windows_arr[i + 1]
+                sample_name = sample_names_arr[i // 2]
+
+                # Filter the rows that fall within the current time window for the current sample
+                mask = (df['Time'] >= start_time) & (df['Time'] <= end_time)
+                sample_data = df[mask].drop(columns='Time')
+                indices_dictionary[sample_name] = sample_data.index.tolist()
+                # Store the filtered data as a new column in the dictionary
+                samples_data[sample_name] = np.concatenate([sample_data[col].values for col in sample_data.columns])
+
+                # Store the column names for each row
+                column_names_list.extend(sample_data.columns)
+
+            decider, length_of_arrays = self.check_array_length(samples_data)
+
+            magic_number = num_columns
+            if decider:
+                final_step = length_of_arrays / magic_number
+            else:
+                largest_value = max(length_of_arrays)
+
+                # Step 2: Iterate through the dictionary of numpy arrays
+                for key, array in samples_data.items():
+                    # Step 3: Check if the length of the array matches the largest value
+                    if len(array) == largest_value:
+                        final_step = len(array) / magic_number
+                    else:
+                        # Calculate the integer and step as described in the question
+                        integer = (largest_value - len(array)) / magic_number
+                        step = len(array) / magic_number
+
+                        nan_values = np.full((int(integer),), np.nan)
+
+                        # Insert np.nan values at each step
+                        for i in range(1, magic_number+1):
+                            insert_index = (i * step) + ((i-1) * integer)
+                            if insert_index == array.size:
+                                array = np.concatenate((array, nan_values))
+                            else:
+                                array = np.insert(array, int(insert_index), nan_values)
+
+                        # Update the dictionary with the modified array
+                        samples_data[key] = array
+
+
+            # Convert the dictionary to a new DataFrame
+            result_df = pd.DataFrame(samples_data)
+
+            if self.data_type == 'iCap TQ (Daisy)':
+                self.list_of_unique_masses_in_file = list_of_column_names[1:]
+
+            for k, i in enumerate(self.list_of_unique_masses_in_file):
+                if k == 0:
+                    mass_name_array = np.full(shape=(int(final_step),), fill_value=i)
+                else:
+                    filler = np.full(shape=(int(final_step),), fill_value=i)
+                    mass_name_array = np.concatenate((mass_name_array, filler))
+            result_df.insert(0, 'Unnamed: 2', mass_name_array)
+
+            self.sample_data_dictionary[sample] = result_df
 
     def calculate_logfile_extension(self, log_data):
         part_one = [x - self.extension.get() for x in log_data[::2]]
@@ -613,5 +726,8 @@ class ImageSynchronizer:
     def set_list_of_unique_masses_in_file(self, list):
         self.list_of_unique_masses_in_file = list
 
-    def get_data(self):
-        return self.synchronized_data, self.list_of_unique_masses_in_file, self.time_data_sample
+    def get_data(self, sample_name):
+        if sample_name == 'Full Data':
+            return self.sample_data_dictionary, self.list_of_unique_masses_in_file, self.time_data_sample
+        else:
+            return self.sample_data_dictionary[sample_name], self.list_of_unique_masses_in_file, self.time_data_sample

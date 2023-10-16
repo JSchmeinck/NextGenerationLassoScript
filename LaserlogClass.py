@@ -16,7 +16,7 @@ class Laserlog:
         df = self.clean_laserlog_dataframe
         sample_chunks_dictionary: dict = {}
 
-        if self.experiment.synchronized:
+        if self.experiment.synchronized and self.experiment.gui.widgets.multiple_samples is False:
             sample_chunks_dictionary[f'Sample_1'] = df
             return sample_chunks_dictionary
 

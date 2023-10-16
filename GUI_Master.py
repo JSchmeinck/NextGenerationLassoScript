@@ -157,13 +157,18 @@ class GUI:
 
     def change_of_synchronization_mode(self):
         if self.widgets.synchronization.get():
-            self.widgets.view_logfile_button.configure(state='active')
             self.widgets.button_synchronization.configure(state='active')
+            self.widgets.checkbutton_multiple_samples.configure(state='active')
+            if self.widgets.multiple_samples.get():
+                self.widgets.view_logfile_button.configure(state='active')
+            else:
+                self.widgets.view_logfile_button.configure(state='disabled')
             if self.widgets.data_type.get() == 'iCap TQ (Daisy)':
                 self.widgets.separator_import.set(',')
         else:
             self.widgets.button_synchronization.configure(state='disabled')
             self.widgets.view_logfile_button.configure(state='disabled')
+            self.widgets.checkbutton_multiple_samples.configure(state='disabled')
 
     def moveup(self):
         """
@@ -208,6 +213,8 @@ class GUI:
 
         synchronized = self.synchronization_query()
 
+        multiple_samples = self.widgets.multiple_samples.get()
+
         sample_rawdata_dictionary = self.importer.import_sample_file(data_type=self.widgets.data_type.get(),
                                                                      synchronized=synchronized)
 
@@ -215,6 +222,9 @@ class GUI:
                                                                laser_type=self.widgets.laser_type.get(),
                                                                iolite_file=synchronized,
                                                                rectangular_data_calculation=True)
+
+        if multiple_samples:
+            logfile_dataframe = self.logfile_viewer.divide_samples(logfile=logfile_dataframe)
 
         self.experiment = ExperimentClass.Experiment(gui=self,
                                                      raw_laser_logfile_dataframe=logfile_dataframe,

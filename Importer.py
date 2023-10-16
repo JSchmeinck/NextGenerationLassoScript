@@ -50,12 +50,11 @@ class Importer:
                 type_array = type_array.repeat(2)
                 type_array[1::2] = np.nan
 
-                if logfile_viewer:
-                    spotsize_array = iolite_dataframe['Spot Size (um)'].to_numpy()
-                    spotsize_array = spotsize_array[0::7]
-                    spotsize_array = spotsize_array.repeat(2)
-                    spotsize_array = spotsize_array.astype(float)
-                    spotsize_array[1::2] = np.nan
+                spotsize_array = iolite_dataframe['Spot Size (um)'].to_numpy()
+                spotsize_array = spotsize_array[0::7]
+                spotsize_array = spotsize_array.repeat(2)
+                spotsize_array = spotsize_array.astype(float)
+                spotsize_array[1::2] = np.nan
 
                 x_array = iolite_dataframe['Intended X(um)'].dropna().values
                 y_array = iolite_dataframe['Intended Y(um)'].dropna().values
@@ -67,8 +66,7 @@ class Importer:
                 logfile_dictionary['Scan Speed(Î¼m/sec)'] = scan_speed_array
                 logfile_dictionary['X(um)'] = x_array
                 logfile_dictionary['Y(um)'] = y_array
-                if logfile_viewer:
-                    logfile_dictionary['Spotsize'] = spotsize_array
+                logfile_dictionary['Spotsize'] = spotsize_array
 
                 logfile_dataframe = pd.DataFrame(logfile_dictionary)
 
@@ -105,12 +103,12 @@ class Importer:
                 type_array = type_array[0::6]
                 type_array = type_array.repeat(2)
                 type_array[1::2] = np.nan
-                if logfile_viewer:
-                    spotsize_array = iolite_dataframe['Spot Size (um)'].to_numpy()
-                    spotsize_array = spotsize_array[:, 0]
-                    spotsize_array = spotsize_array[0::6]
-                    spotsize_array = spotsize_array.repeat(2)
-                    spotsize_array[1::2] = np.nan
+
+                spotsize_array = iolite_dataframe['Spot Size (um)'].to_numpy()
+                spotsize_array = spotsize_array[:, 0]
+                spotsize_array = spotsize_array[0::6]
+                spotsize_array = spotsize_array.repeat(2)
+                spotsize_array[1::2] = np.nan
 
                 x_array = iolite_dataframe['Intended X(um)'].dropna().values
                 y_array = iolite_dataframe['Intended Y(um)'].dropna().values
@@ -122,8 +120,8 @@ class Importer:
                 logfile_dictionary['Scan Speed(Î¼m/sec)'] = scan_speed_array
                 logfile_dictionary['X(um)'] = x_array
                 logfile_dictionary['Y(um)'] = y_array
-                if logfile_viewer:
-                    logfile_dictionary['Spotsize'] = spotsize_array
+
+                logfile_dictionary['Spotsize'] = spotsize_array
 
                 logfile_dataframe = pd.DataFrame(logfile_dictionary)
 
@@ -202,7 +200,7 @@ class Importer:
                 with open(m) as f:
                     df: pd.DataFrame = pd.read_csv(f, sep=self.gui.get_separator_import(), skiprows=2, engine='python')
                 df.drop(columns=[df.columns[-1]], inplace=True)
-                sample_rawdata_dictionary[f'{self.gui.filename_list[n]}'] = df
+                sample_rawdata_dictionary, list_of_unique_masses_in_file, time_data_sample = self.gui.synchronizer.get_data(sample_name='Full Data')
 
             return sample_rawdata_dictionary
 

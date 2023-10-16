@@ -102,7 +102,7 @@ class Experiment:
             for sample_name, sample_rawdata_dataframe in self.sample_rawdata_dictionary.items():
                 rawdata_extracted_masses_dictionary = {}
                 dwelltime_dictionary = {}
-                synchronized_data, list_of_unique_masses_in_file, time_data_sample = self.gui.synchronizer.get_data()
+                synchronized_data, list_of_unique_masses_in_file, time_data_sample = self.gui.synchronizer.get_data(sample_name=sample_name)
                 if self.data_type == 'iCap TQ (Daisy)':
                     for index, mass in enumerate(list_of_unique_masses_in_file):
                         indiviual_dwelltime = (time_data_sample[1]-time_data_sample[0])/len(list_of_unique_masses_in_file)

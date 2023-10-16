@@ -29,11 +29,19 @@ class LogfileViewer:
         self.label = tk.Label(self.window, text="", bd=1, relief=tk.SUNKEN, anchor=tk.W)
         self.label.pack(side=tk.BOTTOM, fill=tk.X)
 
+        self.polygon_vertices_list_start = []
+        self.polygon_vertices_list_end = []
+        self.polygon_vertices_list_complete = []
+        self.polygon_dictionary = {}
 
     def on_closing(self):
         self.window.withdraw()
 
     def show_logfile(self):
+        self.ax.cla()
+        self.polygon_dictionary = {}
+
+
 
         logfile_dataframe = self.gui.importer.import_laser_logfile(logfile=self.gui.logfile_filepath,
                                                                    laser_type=self.gui.widgets.laser_type.get(),
@@ -41,7 +49,12 @@ class LogfileViewer:
                                                                    rectangular_data_calculation=True,
                                                                    logfile_viewer=True)
 
+        sample_separated_logfile = self.divide_samples(logfile=logfile_dataframe)
+
         xmin, xmax, ymin, ymax = self.buid_rectangles(logfile=logfile_dataframe)
+
+        for sample_number, polygon_file in self.polygon_dictionary.items():
+            self.build_polygons(number=sample_number, polygon_vertices=polygon_file)
 
         self.ax.set_xlim(left=xmin*0.8, right=xmax*1.2)
         self.ax.set_ylim(bottom=ymin * 0.95, top=ymax * 1.05)
@@ -63,12 +76,18 @@ class LogfileViewer:
 
     def buid_rectangles(self, logfile):
         self.rectangles_dictionary = {}
-
+        sample_number = 0
         for idx, row in logfile.iloc[::2].iterrows():
+            if 'start' in row['Name']:
+                sample_number += 1
             x_start = row['X(um)']/1000
             y_start = row['Y(um)']/1000
             width = (logfile.loc[idx + 1, 'X(um)'] - row['X(um)'])/1000
             height = row['Spotsize']/1000
+
+            self.polygon_vertices_list_start.append([x_start, y_start])
+            self.polygon_vertices_list_end.append([x_start + width, y_start + height])
+
             if idx == 0:
                 xmin = x_start
                 xmax = x_start + width
@@ -87,8 +106,24 @@ class LogfileViewer:
             self.ax.add_patch(rectangle)
 
             self.rectangles_dictionary[row['Name']] = rectangle
+            if 'end' in row['Name']:
+                self.polygon_vertices_list_end.reverse()
+                self.polygon_vertices_list_complete = self.polygon_vertices_list_start + self.polygon_vertices_list_end
+                self.polygon_dictionary[f'{sample_number}'] = self.polygon_vertices_list_complete
+                self.polygon_vertices_list_start = []
+                self.polygon_vertices_list_end = []
 
         return xmin, xmax, ymin, ymax
+
+    def build_polygons(self, number, polygon_vertices):
+        polygon_patch = patches.Polygon(polygon_vertices, closed=True, color="red",
+                                        fill=False)
+        self.ax.add_patch(polygon_patch)
+
+        centroid_x = sum(p[0] for p in polygon_vertices) / len(polygon_vertices)
+        centroid_y = sum(p[1] for p in polygon_vertices) / len(polygon_vertices)
+
+        self.ax.text(centroid_x, centroid_y, number, ha='center', va='center', fontsize=20, color='black')
 
     def on_hover(self, event):
         for name, rectangle in self.rectangles_dictionary.items():
@@ -96,3 +131,131 @@ class LogfileViewer:
                 self.label.config(text=name)
                 return
         self.label.config(text="")
+
+    def divide_samples(self, logfile, sample_overview=False):
+        sample_overview_dictionary = {}
+        sample_number = 1
+        sample_new = True
+        list_of_sample_idx = []
+        list_of_sample_names = []
+        list_of_sample_x_starts = []
+        list_of_sample_x_ends = []
+        list_of_sample_y_bottoms = []
+        list_of_sample_spotsizes = []
+        for idx, row in logfile.iloc[::2].iterrows():
+
+            x_start = row['X(um)'] / 1000
+            y_bottom = row['Y(um)'] / 1000
+            width = (logfile.loc[idx + 1, 'X(um)'] - row['X(um)']) / 1000
+            spotsize = row['Spotsize'] / 1000
+            x_end = x_start + width
+            name = row['Name']
+
+            if idx == 0 or sample_new:
+                list_of_sample_idx.append(idx)
+                list_of_sample_names.append(name)
+                list_of_sample_x_starts.append(x_start)
+                list_of_sample_x_ends.append(x_end)
+                list_of_sample_y_bottoms.append(y_bottom)
+                list_of_sample_spotsizes.append(spotsize)
+                sample_new = False
+            else:
+                if spotsize not in list_of_sample_spotsizes:
+                    logfile.loc[list_of_sample_idx[0], 'Name'] = f'{logfile.loc[list_of_sample_idx[0], "Name"]} (start)'
+                    logfile.loc[list_of_sample_idx[-1], 'Name'] = f'{logfile.loc[list_of_sample_idx[-1], "Name"]} (end)'
+                    sample_overview_dictionary[f'Sample {sample_number}'] = {}
+                    sample_overview_dictionary[f'Sample {sample_number}']['Start_Name'] = list_of_sample_names[0]
+                    sample_overview_dictionary[f'Sample {sample_number}']['End_Name'] = list_of_sample_names[-1]
+                    sample_overview_dictionary[f'Sample {sample_number}']['idx_List'] = list_of_sample_idx
+                    sample_overview_dictionary[f'Sample {sample_number}']['Names'] = list_of_sample_names
+                    sample_number = sample_number + 1
+                    sample_new = True
+                    list_of_sample_idx = []
+                    list_of_sample_names = []
+                    list_of_sample_x_starts = []
+                    list_of_sample_x_ends = []
+                    list_of_sample_y_bottoms = []
+                    list_of_sample_spotsizes = []
+                if float("{:.3f}".format(y_bottom - spotsize)) not in list_of_sample_y_bottoms:
+                    logfile.loc[list_of_sample_idx[0], 'Name'] = f'{logfile.loc[list_of_sample_idx[0], "Name"]} (start)'
+                    logfile.loc[list_of_sample_idx[-1], 'Name'] = f'{logfile.loc[list_of_sample_idx[-1], "Name"]} (end)'
+                    sample_overview_dictionary[f'Sample {sample_number}'] = {}
+                    sample_overview_dictionary[f'Sample {sample_number}']['Start_Name'] = list_of_sample_names[0]
+                    sample_overview_dictionary[f'Sample {sample_number}']['End_Name'] = list_of_sample_names[-1]
+                    sample_overview_dictionary[f'Sample {sample_number}']['idx_List'] = list_of_sample_idx
+                    sample_overview_dictionary[f'Sample {sample_number}']['Names'] = list_of_sample_names
+                    sample_number = sample_number + 1
+                    sample_new = True
+                    list_of_sample_idx = []
+                    list_of_sample_names = []
+                    list_of_sample_x_starts = []
+                    list_of_sample_x_ends = []
+                    list_of_sample_y_bottoms = []
+                    list_of_sample_spotsizes = []
+                for x_start_legacy, x_end_legacy in zip(list_of_sample_x_starts, list_of_sample_x_ends):
+                    # x_start is inside the legacy line and x_end is inside the legacy line
+                    if x_start_legacy <= x_start and x_end <= x_end_legacy:
+                        list_of_sample_idx.append(idx)
+                        list_of_sample_names.append(name)
+                        list_of_sample_x_starts.append(x_start)
+                        list_of_sample_x_ends.append(x_end)
+                        list_of_sample_y_bottoms.append(y_bottom)
+                        list_of_sample_spotsizes.append(spotsize)
+                        break
+                    # x_start is to the left of the legacy line and x_end is inside the legacy line
+                    elif x_end_legacy >= x_start <= x_start_legacy <= x_end <= x_end_legacy:
+                        list_of_sample_idx.append(idx)
+                        list_of_sample_names.append(name)
+                        list_of_sample_x_starts.append(x_start)
+                        list_of_sample_x_ends.append(x_end)
+                        list_of_sample_y_bottoms.append(y_bottom)
+                        list_of_sample_spotsizes.append(spotsize)
+                        break
+                    # x_start is inside the legacy line and x_end is to the right of the legacy line
+                    elif x_start_legacy <= x_start <= x_end_legacy <= x_end >= x_start_legacy:
+                        list_of_sample_idx.append(idx)
+                        list_of_sample_names.append(name)
+                        list_of_sample_x_starts.append(x_start)
+                        list_of_sample_x_ends.append(x_end)
+                        list_of_sample_y_bottoms.append(y_bottom)
+                        list_of_sample_spotsizes.append(spotsize)
+                        break
+                    # x_start is to the left of the legacy line and x_end is to the right of the legacy line
+                    elif x_start_legacy >= x_start <= x_end_legacy <= x_end >= x_start_legacy:
+                        list_of_sample_idx.append(idx)
+                        list_of_sample_names.append(name)
+                        list_of_sample_x_starts.append(x_start)
+                        list_of_sample_x_ends.append(x_end)
+                        list_of_sample_y_bottoms.append(y_bottom)
+                        list_of_sample_spotsizes.append(spotsize)
+                        break
+                    else:
+                        logfile.loc[
+                            list_of_sample_idx[0], 'Name'] = f'{logfile.loc[list_of_sample_idx[0], "Name"]} (start)'
+                        logfile.loc[
+                            list_of_sample_idx[-1], 'Name'] = f'{logfile.loc[list_of_sample_idx[-1], "Name"]} (end)'
+                        sample_overview_dictionary[f'Sample {sample_number}'] = {}
+                        sample_overview_dictionary[f'Sample {sample_number}']['Start_Name'] = list_of_sample_names[0]
+                        sample_overview_dictionary[f'Sample {sample_number}']['End_Name'] = list_of_sample_names[-1]
+                        sample_overview_dictionary[f'Sample {sample_number}']['idx_List'] = list_of_sample_idx
+                        sample_overview_dictionary[f'Sample {sample_number}']['Names'] = list_of_sample_names
+                        sample_number = sample_number + 1
+                        sample_new = True
+                        list_of_sample_idx = []
+                        list_of_sample_names = []
+                        list_of_sample_x_starts = []
+                        list_of_sample_x_ends = []
+                        list_of_sample_y_bottoms = []
+                        list_of_sample_spotsizes = []
+            if idx == len(logfile)-2:
+                logfile.loc[list_of_sample_idx[0], 'Name'] = f'{logfile.loc[list_of_sample_idx[0], "Name"]} (start)'
+                logfile.loc[list_of_sample_idx[-1], 'Name'] = f'{logfile.loc[list_of_sample_idx[-1], "Name"]} (end)'
+                sample_overview_dictionary[f'Sample {sample_number}'] = {}
+                sample_overview_dictionary[f'Sample {sample_number}']['Start_Name'] = list_of_sample_names[0]
+                sample_overview_dictionary[f'Sample {sample_number}']['End_Name'] = list_of_sample_names[-1]
+                sample_overview_dictionary[f'Sample {sample_number}']['idx_List'] = list_of_sample_idx
+                sample_overview_dictionary[f'Sample {sample_number}']['Names'] = list_of_sample_names
+
+        if sample_overview:
+            return logfile, sample_overview_dictionary
+        return logfile
