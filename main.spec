@@ -8,7 +8,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('lassoimage.ico', '.'), ('Warning Icon.png', '.'), ('Error Icon.png', '.')],
     hiddenimports=['xlsxwriter'],
     hookspath=[],
     hooksconfig={},

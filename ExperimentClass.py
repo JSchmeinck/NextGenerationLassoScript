@@ -8,23 +8,6 @@ import LaserlogClass
 import RawdataSampleClass
 
 
-def popup_error_message(title, message):
-    messagebox.showerror(title=title, message=message)
-
-
-def popup_info_message(title, message):
-    messagebox.showinfo(title=title, message=message)
-
-
-def popup_yesnocancel_message(title, message):
-    messagebox.askyesnocancel(title=title, message=message)
-
-
-def popup_yesno_message(title, message):
-    popup_yes_no = messagebox.askyesno(title=title, message=message)
-    return popup_yes_no
-
-
 def get_dwell_times_from_rawdata(masses: list, dataframe: pd.DataFrame):
     """
     Computes the average dwell time and a total dwell time cycle from a dataframe for the masses supplied
@@ -96,21 +79,36 @@ class Experiment:
                                                       clean_laserlog_dataframe=filtered_df,
                                                       name=name)
 
+    def average_dwelltime(self, time_values):
+        differences = []
+
+        for i in range(len(time_values) - 1):
+            diff = time_values[i + 1] - time_values[i]
+            differences.append(diff)
+
+        if len(differences) > 0:
+            average_difference = sum(differences) / len(differences)
+            return average_difference
+        else:
+            return 0  # Handle the case where there are no adjacent values to calculate the difference.
+
     def build_rawdatasample_objects(self):
         sample_counter = 1
         if self.synchronized:
             for sample_name, sample_rawdata_dataframe in self.sample_rawdata_dictionary.items():
                 rawdata_extracted_masses_dictionary = {}
                 dwelltime_dictionary = {}
-                synchronized_data, list_of_unique_masses_in_file, time_data_sample = self.gui.synchronizer.get_data(sample_name=sample_name)
+                synchronized_data, list_of_unique_masses_in_file, time_data_sample = self.gui.synchronizer.get_data(
+                    sample_name=sample_name)
                 if self.data_type == 'iCap TQ (Daisy)':
                     for index, mass in enumerate(list_of_unique_masses_in_file):
-                        indiviual_dwelltime = (time_data_sample[1]-time_data_sample[0])/len(list_of_unique_masses_in_file)
-                        dwelltime_dictionary[mass] = indiviual_dwelltime * (index+1)
+                        indiviual_dwelltime = (time_data_sample[1] - time_data_sample[0]) / len(
+                            list_of_unique_masses_in_file)
+                        dwelltime_dictionary[mass] = indiviual_dwelltime * (index + 1)
                 if self.data_type == 'EIC':
                     for index, mass in enumerate(list_of_unique_masses_in_file):
-                        dwelltime_dictionary[mass] = time_data_sample[1]-time_data_sample[0]
-                dwelltime_dictionary['Cycle'] = time_data_sample[1]-time_data_sample[0]
+                        dwelltime_dictionary[mass] = time_data_sample[1] - time_data_sample[0]
+                dwelltime_dictionary['Cycle'] = self.average_dwelltime(time_data_sample)
                 list_of_col_names = []
                 for k, i in enumerate(list_of_unique_masses_in_file):
                     extracted_sample_column_dictionary = {}
@@ -191,11 +189,11 @@ class Experiment:
                 self.RawdataSample_objects_dictionary[sample_name] = rawdatasample
 
         elif self.data_type == 'Agilent 7900':
-            rawdata_extracted_masses_dictionary = {}
             for sample_name, sample_rawdata_dictionary in self.sample_rawdata_dictionary.items():
+                rawdata_extracted_masses_dictionary = {}
                 dwelltime_dictionary = {}
-                sample_dataframe = sample_rawdata_dictionary['Line_1']
-                header_list = list(sample_dataframe.columns())
+                sample_dataframe: pd.DataFrame = sample_rawdata_dictionary['Line_1']
+                header_list = list(sample_dataframe)
                 mass_options_list = header_list[1:]
                 dwelltime_array = sample_dataframe[[sample_dataframe.columns[0]]].to_numpy()
                 if dwelltime_array.size > 1:
@@ -205,17 +203,21 @@ class Experiment:
                 for mass in mass_options_list:
                     rawdata_extracted_masses_dictionary[mass] = {}
                     dwelltime_dictionary[mass] = dwelltime_dictionary['Cycle'] / len(mass_options_list)
-                for line, raw_dataframe in sample_rawdata_dataframe.items():
+                list_of_column_names = []
+                for line, raw_dataframe in sample_rawdata_dictionary.items():
                     for mass in mass_options_list:
-                        rawdata_extracted_masses_dictionary[mass][f'Line_{line}'] = raw_dataframe[mass].to_numpy()
+                        rawdata_extracted_masses_dictionary[mass][f'{line}'] = raw_dataframe[mass].to_numpy()
+                    list_of_column_names.append(line)
+
                 rawdatasample = RawdataSampleClass.RawdataSample(experiment=self,
                                                                  name=sample_name,
                                                                  rawdata_dictionary=rawdata_extracted_masses_dictionary,
                                                                  dwelltime_dictionary=dwelltime_dictionary,
                                                                  sample_number=f'Sample_{sample_counter}',
-                                                                 fill_value=self.fill_value)
+                                                                 fill_value=self.fill_value,
+                                                                 column_names=list_of_column_names)
                 sample_counter += 1
-            self.RawdataSample_objects_dictionary[sample_name] = rawdatasample
+                self.RawdataSample_objects_dictionary[sample_name] = rawdatasample
 
     def pass_sample_logfile_information(self, sample_number: str):
         return self.laserlog_object.get_log_information_of_rawdata_sample(sample_number)
@@ -225,9 +227,9 @@ class Experiment:
         self.gui.increase_progress(10)
         state_log = self.laserlog_object.build_sampleinlog_objects()
         if state_log is False:
-            popup_error_message(title='Logfile Error',
-                                message='Logfile shows new pattern starting without previous '
-                                        'pattern being completed by end statement')
+            self.gui.notifications.notification_error(header='Logfile Error',
+                                                      body='Logfile shows new pattern starting without previous '
+                                                           'pattern being completed by end statement')
             self.gui.reset_progress()
             return
         self.gui.increase_progress(30)
@@ -238,8 +240,8 @@ class Experiment:
         self.gui.increase_progress(10)
         state = self.match_log_and_sample()
         if state is False:
-            popup_error_message(title='Match Error',
-                                message='Unable to match laser logfile and rawdata files!')
+            self.gui.notifications.notification_error(header='Match Error',
+                                                      body='Unable to match laser logfile and rawdata files!')
             self.gui.reset_progress()
             return
         for i in self.RawdataSample_objects_dictionary.values():
@@ -248,14 +250,15 @@ class Experiment:
         state = self.build_new_rawdata_files()
         self.gui.increase_progress(20)
         if state is False:
-            popup_error_message(title='Export Path Error',
-                                message='No Directory for the export of '
-                                        'the new rectangular rawdata files has been chosen!')
+            self.gui.notifications.notification_error(header='Export Error', body='No Directory for the export of '
+                                                                                  'the new rectangular rawdata files has been chosen!')
+
             self.gui.reset_progress()
             return
         else:
-            popup_info_message(title='File Created',
-                               message='The rectangular rawdata Files have been successfully created.')
+            self.gui.notifications.notification_folder(header='Export Successful',
+                                                       body='The rectangular rawdata Files have been successfully created.',
+                                                       folder=self.get_export_path())
 
     def build_laser_ablation_times(self):
         # Step 1
@@ -263,16 +266,15 @@ class Experiment:
         # Step 2
         state_log = self.laserlog_object.build_sampleinlog_objects()
         if state_log is False:
-            popup_error_message(title='Logfile Error',
-                                message='Logfile shows new pattern starting without previous '
-                                        'pattern being completed by end statement')
+            self.gui.notifications.notification_error(header='Match Error',
+                                                      body='Unable to match laser logfile and rawdata files!')
             self.gui.reset_progress()
             return
         # Step 3
         state = self.laserlog_object.build_laser_pattern_duration_sheet()
         if state is False:
-            popup_error_message(title='Export Path Error',
-                                message='No Directory for the export of the pattern duration file has been chosen!')
+            self.gui.notifications.notification_error(header='Export Path Error',
+                                                      body='No Directory for the export of the pattern duration file has been chosen!')
             self.gui.reset_progress()
             return
 
@@ -287,12 +289,16 @@ class Experiment:
                 if amount_of_rawdata_lines == amount_of_log_lines:
                     pass
                 else:
-                    decider = popup_yesno_message(title='Logfile and and Rawdata match issue',
-                                                  message='The amount of ablated lines dont match between the laser '
-                                                          'logfile and the predetermined rawdata file.'
-                                                          'Do you want to use automatic assignment? '
-                                                          'This only works if all of your samples have a unique '
-                                                          'amount of ablated lines.')
+                    decider = self.gui.notifications.notification_yesno(header='Logfile and and Rawdata match issue',
+                                                                        body='The amount of ablated lines dont match '
+                                                                             'between the laser'
+                                                                             'logfile and the predetermined rawdata '
+                                                                             'file.'
+                                                                             'Do you want to use automatic assignment? '
+                                                                             ''
+                                                                             '(This only works if all of your samples '
+                                                                             'have a unique'
+                                                                             'amount of ablated lines)')
                     if decider is True:
                         self.match_log_and_sample(match_by_line_count=decider)
                         return True
@@ -335,7 +341,7 @@ class Experiment:
                     sample_value = int(line_number[0])
                     # Bringall lines to the same size
                     extra_zeros = max_length - line_array.size
-                    extra_zeros = np.zeros(extra_zeros)
+                    extra_zeros = np.full(fill_value=str(self.fill_value), shape=extra_zeros)
                     build_array = np.concatenate((line_array, extra_zeros))
                     # save the lin data in a dictionary
                     if first_mass is True:
@@ -388,8 +394,9 @@ class Experiment:
 
             writer.close()
 
-            popup_info_message(title='File Created',
-                               message='The Laser Duration file has been successfully created')
+            self.gui.notifications.notification_folder(header='Export Successful',
+                                                       body='The Pattern Duration Files has been successfully created.',
+                                                       folder=self.get_export_path())
             return True
         except PermissionError:
             return False

@@ -16,7 +16,10 @@ class Laserlog:
         df = self.clean_laserlog_dataframe
         sample_chunks_dictionary: dict = {}
 
-        if self.experiment.synchronized and self.experiment.gui.widgets.multiple_samples is False:
+        if self.experiment.synchronized and self.experiment.gui.widgets.multiple_samples.get() is False:
+            if self.experiment.gui.widgets.first_line_synchronization.get():
+                df = df.drop([0, 1])
+                df = df.reset_index(drop=True)
             sample_chunks_dictionary[f'Sample_1'] = df
             return sample_chunks_dictionary
 
@@ -90,7 +93,7 @@ class Laserlog:
             scan_speed = instance.get_scan_speed()
             raw_line_dictionary = instance.get_true_line_information_dictionary(line_pattern_sheet=True)
             if raw_line_dictionary is False:
-                self.send_error_message(title='LogFile Error', message='Not able to match row in the laser logfile'
+                self.experiment.gui.notifications.notification_error(header='LogFile Error', body='Not able to match row in the laser logfile'
                                                                        ' to an ablation line')
             for line, line_info in raw_line_dictionary.items():
 

@@ -78,6 +78,9 @@ class LogfileViewer:
         self.rectangles_dictionary = {}
         sample_number = 0
         for idx, row in logfile.iloc[::2].iterrows():
+            if self.gui.widgets.first_line_synchronization.get():
+                if idx == 0:
+                    continue
             if 'start' in row['Name']:
                 sample_number += 1
             x_start = row['X(um)']/1000
@@ -93,6 +96,12 @@ class LogfileViewer:
                 xmax = x_start + width
                 ymin = y_start
                 ymax = y_start + height
+            if self.gui.widgets.first_line_synchronization.get():
+                if idx == 2:
+                    xmin = x_start
+                    xmax = x_start + width
+                    ymin = y_start
+                    ymax = y_start + height
             if x_start < xmin:
                 xmin = x_start
             if (x_start + width) > xmax:
@@ -132,7 +141,7 @@ class LogfileViewer:
                 return
         self.label.config(text="")
 
-    def divide_samples(self, logfile, sample_overview=False):
+    def divide_samples(self, logfile, sample_overview=False, multiple_samples_query=False):
         sample_overview_dictionary = {}
         sample_number = 1
         sample_new = True
@@ -143,6 +152,9 @@ class LogfileViewer:
         list_of_sample_y_bottoms = []
         list_of_sample_spotsizes = []
         for idx, row in logfile.iloc[::2].iterrows():
+            if self.gui.widgets.first_line_synchronization.get():
+                if idx == 0:
+                    continue
 
             x_start = row['X(um)'] / 1000
             y_bottom = row['Y(um)'] / 1000
@@ -151,7 +163,7 @@ class LogfileViewer:
             x_end = x_start + width
             name = row['Name']
 
-            if idx == 0 or sample_new:
+            if idx == 0 or sample_new is True:
                 list_of_sample_idx.append(idx)
                 list_of_sample_names.append(name)
                 list_of_sample_x_starts.append(x_start)
@@ -176,6 +188,7 @@ class LogfileViewer:
                     list_of_sample_x_ends = []
                     list_of_sample_y_bottoms = []
                     list_of_sample_spotsizes = []
+                    continue
                 if float("{:.3f}".format(y_bottom - spotsize)) not in list_of_sample_y_bottoms:
                     logfile.loc[list_of_sample_idx[0], 'Name'] = f'{logfile.loc[list_of_sample_idx[0], "Name"]} (start)'
                     logfile.loc[list_of_sample_idx[-1], 'Name'] = f'{logfile.loc[list_of_sample_idx[-1], "Name"]} (end)'
@@ -192,6 +205,7 @@ class LogfileViewer:
                     list_of_sample_x_ends = []
                     list_of_sample_y_bottoms = []
                     list_of_sample_spotsizes = []
+                    continue
                 for x_start_legacy, x_end_legacy in zip(list_of_sample_x_starts, list_of_sample_x_ends):
                     # x_start is inside the legacy line and x_end is inside the legacy line
                     if x_start_legacy <= x_start and x_end <= x_end_legacy:
@@ -247,6 +261,7 @@ class LogfileViewer:
                         list_of_sample_x_ends = []
                         list_of_sample_y_bottoms = []
                         list_of_sample_spotsizes = []
+                        break
             if idx == len(logfile)-2:
                 logfile.loc[list_of_sample_idx[0], 'Name'] = f'{logfile.loc[list_of_sample_idx[0], "Name"]} (start)'
                 logfile.loc[list_of_sample_idx[-1], 'Name'] = f'{logfile.loc[list_of_sample_idx[-1], "Name"]} (end)'
@@ -258,4 +273,12 @@ class LogfileViewer:
 
         if sample_overview:
             return logfile, sample_overview_dictionary
+        if multiple_samples_query:
+            if len(sample_overview_dictionary) > 1:
+                self.gui.multiple_samples_detected = True
+                return
+            else:
+                self.gui.multiple_samples_detected = False
+                return
+
         return logfile

@@ -76,11 +76,16 @@ class Importer:
             if iolite_file and rectangular_data_calculation:
                 with open(logfile) as file:
                     iolite_dataframe = pd.read_csv(file, skiprows=1, header=None)
-                iolite_dataframe.columns = ['Timestamp', 'Sequence Number', 'SubPoint Number', 'Vertex Number',
-                                             'Comment',
-                                             'X(um)', 'Y(um)', 'Intended X(um)', 'Intended Y(um)',
-                                             'Scan Velocity (um/s)',
-                                             'Laser State', 'Laser Rep. Rate (Hz)', 'Spot Type', 'Spot Size (um)']
+                try:
+                    iolite_dataframe.columns = ['Timestamp', 'Sequence Number', 'SubPoint Number', 'Vertex Number',
+                                                 'Comment',
+                                                 'X(um)', 'Y(um)', 'Intended X(um)', 'Intended Y(um)',
+                                                 'Scan Velocity (um/s)',
+                                                 'Laser State', 'Laser Rep. Rate (Hz)', 'Spot Type', 'Spot Size (um)']
+                except ValueError:
+                    self.gui.notifications.notification_error(header='Data Type Error',
+                                                              body='Your Logfile Data does not match your chosen Laser Type')
+                    return False
 
                 logfile_dictionary = {}
 
@@ -130,11 +135,16 @@ class Importer:
             if iolite_file and rectangular_data_calculation is False:
                 with open(logfile) as file:
                     logfile_dataframe = pd.read_csv(file, skiprows=1, header=None)
-                logfile_dataframe.columns = ['Timestamp', 'Sequence Number', 'SubPoint Number', 'Vertex Number',
-                                             'Comment',
-                                             'X(um)', 'Y(um)', 'Intended X(um)', 'Intended Y(um)',
-                                             'Scan Velocity (um/s)',
-                                             'Laser State', 'Laser Rep. Rate (Hz)', 'Spot Type', 'Spot Size (um)']
+                try:
+                    logfile_dataframe.columns = ['Timestamp', 'Sequence Number', 'SubPoint Number', 'Vertex Number',
+                                                 'Comment',
+                                                 'X(um)', 'Y(um)', 'Intended X(um)', 'Intended Y(um)',
+                                                 'Scan Velocity (um/s)',
+                                                 'Laser State', 'Laser Rep. Rate (Hz)', 'Spot Type', 'Spot Size (um)']
+                except ValueError:
+                    self.gui.notifications.notification_error(header='Data Type Error',
+                                                              body='Your Logfile Data does not match your chosen Laser Type')
+                    return False
                 return logfile_dataframe
 
             else:
@@ -175,9 +185,9 @@ class Importer:
             return sample_rawdata_dictionary
 
         if data_type == 'Agilent 7900':
-            individual_lines_dictionary = {}
             # Loop through the imported directorys one by one
             for n, m in enumerate(self.gui.list_of_files):
+                individual_lines_dictionary = {}
                 directory = os.fsencode(m)
                 # Loop trough the files inside the directory
                 for ticker, file in enumerate(os.listdir(directory)):
@@ -191,7 +201,7 @@ class Importer:
                                              skipfooter=1,
                                              engine='python')
                         individual_lines_dictionary[f'Line_{ticker + 1}'] = df
-                sample_rawdata_dictionary[f'{self.gui.filename_list[n]}'] = individual_lines_dictionary
+                    sample_rawdata_dictionary[f'{self.gui.filename_list[n]}'] = individual_lines_dictionary
 
             return sample_rawdata_dictionary
 

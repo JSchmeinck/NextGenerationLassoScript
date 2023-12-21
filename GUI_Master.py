@@ -9,18 +9,21 @@ import Image_Synchronization
 from tkinter import messagebox
 import Importer
 import Logfile_Viewer
+import Windows_Notifications
 
 
 class GUI:
-    def __init__(self, master_window):
+    def __init__(self, master_window, main):
         # Setting up the main window
         self.master_window = master_window
-        self.master_window.title("Lasso Script")
-        self.master_window.geometry('900x550')
+        self.main=main
+        self.master_window.title("LassoTool")
+        self.master_window.geometry('900x600')
         self.master_window.resizable(width=False, height=False)
 
         self.importer = Importer.Importer(gui=self)
         self.logfile_viewer = Logfile_Viewer.LogfileViewer(gui=self, master_window=master_window)
+        self.notifications = Windows_Notifications.Notifications(gui=self)
 
         self.widgets = GUI_Widgets.GUIWidgets(gui_master=self,
                                               master_window=master_window)
@@ -39,10 +42,9 @@ class GUI:
 
         self.synchronizer = Image_Synchronization.ImageSynchronizer(master_gui=self, master_window=self.master_window)
         self.data_is_synchronized = False
-
-
-
-
+        self.data_is_background_corrected = False
+        self.data_is_first_line_synchronized = False
+        self.multiple_samples_detected = False
     def grid_gui_widgets(self):
         self.widgets.grid_gui_widgets()
 
@@ -68,7 +70,7 @@ class GUI:
                                              text='',
                                              values=self.logfile_filename)
         self.reset_progress()
-        self.data_is_synchronized = False
+        self.update_status(reset=True)
         return self.logfile_filepath
 
     def import_samples(self):
@@ -136,7 +138,7 @@ class GUI:
             self.widgets.samples_treeview.insert(parent='', index=i, text='', values=[str(k)])
 
         self.reset_progress()
-        self.data_is_synchronized = False
+        self.update_status(reset=True)
 
     def change_of_instrument(self):
         """
@@ -157,8 +159,11 @@ class GUI:
 
     def change_of_synchronization_mode(self):
         if self.widgets.synchronization.get():
+            self.widgets.move_up_button.configure(state='disabled')
+            self.widgets.move_down_button.configure(state='disabled')
             self.widgets.button_synchronization.configure(state='active')
             self.widgets.checkbutton_multiple_samples.configure(state='active')
+            self.widgets.checkbutton_first_line_synchronization.configure(state='active')
             if self.widgets.multiple_samples.get():
                 self.widgets.view_logfile_button.configure(state='active')
             else:
@@ -166,9 +171,14 @@ class GUI:
             if self.widgets.data_type.get() == 'iCap TQ (Daisy)':
                 self.widgets.separator_import.set(',')
         else:
+            self.widgets.move_up_button.configure(state='active')
+            self.widgets.move_down_button.configure(state='active')
+            self.widgets.checkbutton_first_line_synchronization.configure(state='disabled')
             self.widgets.button_synchronization.configure(state='disabled')
             self.widgets.view_logfile_button.configure(state='disabled')
             self.widgets.checkbutton_multiple_samples.configure(state='disabled')
+
+        self.update_status()
 
     def moveup(self):
         """
@@ -257,35 +267,66 @@ class GUI:
 
         self.experiment.build_laser_ablation_times()
 
+    def update_status(self, reset=False):
+        if reset:
+            self.data_is_synchronized = False
+            self.data_is_background_corrected = False
+            self.data_is_first_line_synchronized = False
+            self.multiple_samples_detected = False
+            self.widgets.data_is_synchronized_checkbutton.grid_remove()
+            self.widgets.first_line_for_synchronization_checkbutton.grid_remove()
+            self.widgets.background_corrected_checkbutton.grid_remove()
+            self.widgets.multiple_samples_detected_checkbutton.grid_remove()
+        if self.widgets.multiple_samples.get():
+            self.widgets.multiple_samples_detected_checkbutton.grid(row=0, column=0, padx=5, pady=5, sticky='w')
+            logfile_dataframe = self.importer.import_laser_logfile(logfile=self.logfile_filepath,
+                                                                   laser_type=self.widgets.laser_type.get(),
+                                                                   iolite_file=True,
+                                                                   rectangular_data_calculation=True)
+            if logfile_dataframe is False:
+                self.widgets.multiple_samples_detected_checkbutton.grid_remove()
+                self.widgets.multiple_samples.set(False)
+                return
+            self.logfile_viewer.divide_samples(logfile=logfile_dataframe, multiple_samples_query=True)
+            self.widgets.multiple_samples_detected.set(self.multiple_samples_detected)
+        if self.widgets.synchronization.get():
+            self.widgets.data_is_synchronized_checkbutton.grid(row=0, column=0, padx=5, pady=5, sticky='w')
+            self.widgets.data_is_synchronized.set(self.data_is_synchronized)
+            self.widgets.first_line_for_synchronization_checkbutton.grid(row=1, column=0, padx=5, pady=5, sticky='w')
+            self.widgets.first_line_for_synchronization.set(self.data_is_first_line_synchronized)
+            self.widgets.background_corrected_checkbutton.grid(row=2, column=0, padx=5, pady=5, sticky='w')
+            self.widgets.background_corrected.set(self.data_is_background_corrected)
+        if self.widgets.synchronization.get() is False:
+            self.widgets.data_is_synchronized_checkbutton.grid_remove()
+            self.widgets.first_line_for_synchronization_checkbutton.grid_remove()
+            self.widgets.background_corrected_checkbutton.grid_remove()
+            self.widgets.multiple_samples_detected_checkbutton.grid_remove()
+
     def synchronization_query(self):
         if self.data_is_synchronized and self.widgets.synchronization:
             synchronized = True
         elif self.data_is_synchronized and self.widgets.synchronization.get() is False:
-            popup_yes_no = messagebox.askyesno(title='Synchronization Warning',
-                                               message='Your data is successfully synchronised but you have not ticked '
+            decider = self.notifications.notification_yesno(header='Synchronization Warning',
+                                               body='Your data is successfully synchronised but you have not ticked '
                                                        'the Synchronize Checkbox. Do you want to continue '
                                                        'with the synchronized data?')
-            if popup_yes_no:
-                synchronized = True
-            else:
-                synchronized = False
+            synchronized = decider
         elif self.data_is_synchronized is False and self.widgets.synchronization.get():
-            popup_yes_no = messagebox.askyesno(title='Synchronization Warning',
-                                               message='Your data not synchronised but you have ticked '
+            decider = self.notifications.notification_yesno(header='Synchronization Warning',
+                                               body='Your data not synchronised but you have ticked '
                                                        'the Synchronize Checkbox. Do you want to continue '
                                                        'with the unsynchronized data?')
-            if popup_yes_no:
-                synchronized = False
-            else:
-                synchronized = True
+            synchronized = decider
         else:
             synchronized = False
         return synchronized
 
     def synchronize_data(self):
-        self.synchronizer.synchronize_data(data_type=self.widgets.data_type.get(),
+        state = self.synchronizer.synchronize_data(data_type=self.widgets.data_type.get(),
                                            import_separator=self.widgets.separator_import.get(),
                                            laser=self.widgets.laser_type.get())
+        if state is False:
+            return
         self.synchronizer.toggle_window_visivility()
 
     def export_directory(self):
@@ -306,8 +347,10 @@ class GUI:
             separator = '\t'
         elif separator_list == 'Space':
             separator = ' '
-        else:
-            separator = separator_list
+        elif separator_list == 'Comma':
+            separator = ','
+        elif separator_list == 'Semicolon':
+            separator = ';'
         return separator
 
     def get_separator_import(self):
