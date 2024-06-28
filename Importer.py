@@ -110,7 +110,6 @@ class Importer:
                 type_array[1::2] = np.nan
 
                 spotsize_array = iolite_dataframe['Spot Size (um)'].to_numpy()
-                spotsize_array = spotsize_array[:, 0]
                 spotsize_array = spotsize_array[0::6]
                 spotsize_array = spotsize_array.repeat(2)
                 spotsize_array[1::2] = np.nan
