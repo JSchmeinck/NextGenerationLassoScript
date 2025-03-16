@@ -142,6 +142,11 @@ class GUIWidgets:
                                                        variable=self.data_type,
                                                        value='EIC',
                                                        command=self.gui_master.change_of_instrument)
+        self.mzml_radiobutton = ttk.Radiobutton(master=self.datatype_frame,
+                                                       text='mzml',
+                                                       variable=self.data_type,
+                                                       value='mzml',
+                                                       command=self.gui_master.change_of_instrument)
 
         self.master_window.grid_columnconfigure(index=0, weight=1)
         self.master_window.grid_columnconfigure(index=1, weight=1)
@@ -281,6 +286,7 @@ class GUIWidgets:
         self.icap_tq_radiobutton.grid(row=1, column=0, padx=(5,0))
         self.agilent7900_radiobutton.grid(row=2, column=0, sticky='w', padx=(5,0))
         self.eic_radiobutton.grid(row=3, column=0, sticky='w', padx=(5,0))
+        self.mzml_radiobutton.grid(row=4, column=0, sticky='w', padx=(5, 0))
         self.header_laser.grid(row=0, column=1, pady=(10, 0))
         self.imagebio_radiobutton.grid(row=1, column=1, padx=(10,0))
         self.cetac_g2plus_radiobutton.grid(row=2, column=1, sticky='w', padx=(10,0))

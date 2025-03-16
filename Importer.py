@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import os
+import pymzml
 
 class Importer:
     def __init__(self, gui):
@@ -214,6 +215,22 @@ class Importer:
 
             return sample_rawdata_dictionary
 
+        if data_type == 'Imzml':
+            run = pymzml.run.Reader(self.gui.list_of_files[0])
+            times = []
+            intensities = []
+
+            for spectrum in run:
+                if spectrum.ms_level == 1:  # Only consider MS1 spectra for TIC
+                    times.append(spectrum.scan_time_in_minutes())  # Time in minutes
+                    intensities.append(sum(spectrum.i))  # Sum of intensities
+
+            sample_rawdata_dictionary = pd.DataFrame(
+                {'Times': times,
+                 'Intensities': intensities
+                 })
+
+            return sample_rawdata_dictionary
     
 
         

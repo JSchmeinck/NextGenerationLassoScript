@@ -129,6 +129,16 @@ class GUI:
             self.filename_list = [os.path.basename(file)]
             self.list_of_files = [file]
 
+        if self.widgets.data_type.get() == 'mzml':
+            self.list_of_files = []
+            self.filename_list = []
+
+            file = tk.filedialog.askopenfilename(title='Choose your sample File',
+                                                              filetypes=[('MZml', '*.mzml')])
+
+            self.filename_list = [os.path.basename(file)]
+            self.list_of_files = [file]
+
 
         for item in self.widgets.samples_treeview.get_children():
             self.widgets.samples_treeview.delete(item)
@@ -154,6 +164,9 @@ class GUI:
             self.widgets.import_samples_button.configure(text='Import Sample Folder')
             self.widgets.separator_import.set(',')
         if self.widgets.data_type.get() == 'EIC':
+            self.widgets.import_samples_button.configure(text='Import Sample')
+            self.widgets.separator_import.set(';')
+        if self.widgets.data_type.get() == 'mzml':
             self.widgets.import_samples_button.configure(text='Import Sample')
             self.widgets.separator_import.set(';')
 
@@ -233,7 +246,7 @@ class GUI:
                                                                iolite_file=synchronized,
                                                                rectangular_data_calculation=True)
 
-        if multiple_samples:
+        if multiple_samples and self.widgets.data_type.get() != 'mzml':
             logfile_dataframe = self.logfile_viewer.divide_samples(logfile=logfile_dataframe)
 
         self.experiment = ExperimentClass.Experiment(gui=self,
@@ -287,7 +300,8 @@ class GUI:
                 self.widgets.multiple_samples_detected_checkbutton.grid_remove()
                 self.widgets.multiple_samples.set(False)
                 return
-            self.logfile_viewer.divide_samples(logfile=logfile_dataframe, multiple_samples_query=True)
+            if self.widgets.data_type.get() != 'mzml':
+                self.logfile_viewer.divide_samples(logfile=logfile_dataframe, multiple_samples_query=True)
             self.widgets.multiple_samples_detected.set(self.multiple_samples_detected)
         if self.widgets.synchronization.get():
             self.widgets.data_is_synchronized_checkbutton.grid(row=0, column=0, padx=5, pady=5, sticky='w')

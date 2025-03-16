@@ -34,6 +34,8 @@ class LogfileViewer:
         self.polygon_vertices_list_complete = []
         self.polygon_dictionary = {}
 
+        self.imzml_logfile_dictionary = {}
+
     def on_closing(self):
         self.window.withdraw()
 
@@ -48,8 +50,6 @@ class LogfileViewer:
                                                                    iolite_file=True,
                                                                    rectangular_data_calculation=True,
                                                                    logfile_viewer=True)
-
-        sample_separated_logfile = self.divide_samples(logfile=logfile_dataframe)
 
         xmin, xmax, ymin, ymax = self.buid_rectangles(logfile=logfile_dataframe)
 
@@ -77,7 +77,10 @@ class LogfileViewer:
     def buid_rectangles(self, logfile):
         self.rectangles_dictionary = {}
         sample_number = 0
+        self.imzml_logfile_dictionary = {}
+        line_number = 0
         for idx, row in logfile.iloc[::2].iterrows():
+            line_number = line_number + 1
             if self.gui.widgets.first_line_synchronization.get():
                 if idx == 0:
                     continue
@@ -111,6 +114,12 @@ class LogfileViewer:
             if (y_start + height) > ymax:
                 ymax = (y_start + height)
 
+            self.imzml_logfile_dictionary[row['Name']] = {}
+            self.imzml_logfile_dictionary[row['Name']]['line_number'] = line_number
+            self.imzml_logfile_dictionary[row['Name']]['x_start'] = x_start
+            self.imzml_logfile_dictionary[row['Name']]['pixel_number'] = round(width/height)
+
+
             rectangle = patches.Rectangle((x_start, y_start), width, height, edgecolor='g', facecolor='none')
             self.ax.add_patch(rectangle)
 
@@ -121,6 +130,11 @@ class LogfileViewer:
                 self.polygon_dictionary[f'{sample_number}'] = self.polygon_vertices_list_complete
                 self.polygon_vertices_list_start = []
                 self.polygon_vertices_list_end = []
+
+        self.imzml_logfile_dictionary['Sample'] = {}
+        self.imzml_logfile_dictionary['Sample']['x_min'] = xmin
+        self.imzml_logfile_dictionary['Sample']['spotsize'] = height
+
 
         return xmin, xmax, ymin, ymax
 

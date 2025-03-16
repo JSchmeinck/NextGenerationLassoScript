@@ -4,6 +4,7 @@ import tkinter.filedialog
 
 import pandas as pd
 import matplotlib.pyplot as plt
+import pymzml
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import tkinter as tk
 import numpy as np
@@ -12,6 +13,8 @@ import keyboard
 from tkinter import ttk
 from matplotlib.collections import LineCollection
 from tkinter import Menu
+from pyimzml.ImzMLWriter import ImzMLWriter
+from pyimzml.compression import ZlibCompression
 
 
 def mask_array(main_array, mask_array, on_value, timestamp_array):
@@ -540,6 +543,10 @@ class ImageSynchronizer:
         self.toggle_window_visivility()
         self.current_offset.set(f'0 s')
 
+        if self.data_type == 'mzml':
+            self.calculate_imzml_times()
+            self.gui.update_status()
+            return
         if self.gui.widgets.multiple_samples.get():
             self.calculate_samples_multiple_samples()
         else:
@@ -788,6 +795,71 @@ class ImageSynchronizer:
         if self.gui.widgets.first_line_synchronization.get():
             self.gui.data_is_first_line_synchronized = True
 
+    def calculate_imzml_times(self):
+
+        time_windows_arr = self.clean_time_array_extended - self.laser_log_time_offset
+        sample_names_arr = self.samples
+
+        max_length = max(len(time_windows_arr), len(sample_names_arr))
+
+        # Pad the arrays with np.nan values to make them the same length
+        time_windows_arr = np.pad(time_windows_arr, (0, max_length - len(time_windows_arr)), mode='constant',
+                                  constant_values=np.nan)
+        sample_names_arr = np.pad(sample_names_arr, (0, max_length - len(sample_names_arr)), mode='constant',
+                                  constant_values='')
+
+        # Create an empty dictionary to hold the data for each sample
+        samples_data = {}
+
+        # Create an empty list to hold the column names for each row
+        column_names_list = []
+
+        # Iterate through the time windows and sample names
+        for i in range(0, len(time_windows_arr), 2):
+            start_time = time_windows_arr[i]
+            sample_name = sample_names_arr[i // 2]
+            self.gui.logfile_viewer.imzml_logfile_dictionary[sample_name]['start_time'] = start_time
+
+        x_min = self.gui.logfile_viewer.imzml_logfile_dictionary['Sample']['x_min']
+        spotsize = self.gui.logfile_viewer.imzml_logfile_dictionary['Sample']['spotsize']
+
+        mzml_file = self.gui.list_of_files[0]
+        run = pymzml.run.Reader(mzml_file)
+        scan_objects = []
+        for spectrum in run:
+            if spectrum.ms_level == 1:  # Only consider MS1 spectra
+                scan_objects.append(spectrum)
+
+
+        with ImzMLWriter(output_filename='imzml_test', mode='processed') as writer:
+
+            for sample_name, sample_dict in self.gui.logfile_viewer.imzml_logfile_dictionary.items():
+                if sample_name == 'Sample':
+                    continue
+                x_offset_in_pixels = round((self.gui.logfile_viewer.imzml_logfile_dictionary[sample_name]['x_start'] -x_min) / spotsize)
+                amount_of_pixels_in_line = self.gui.logfile_viewer.imzml_logfile_dictionary[sample_name]['pixel_number']
+                closest_idx = np.argmin(np.abs(self.time_data_sample - self.gui.logfile_viewer.imzml_logfile_dictionary[sample_name]['start_time']))
+
+                line_number = self.gui.logfile_viewer.imzml_logfile_dictionary[sample_name]['line_number']
+                selected_scans = scan_objects[closest_idx: closest_idx + amount_of_pixels_in_line]
+                print(line_number)
+
+                x, y = x_offset_in_pixels, line_number  # Starting coordinates
+                for scan in selected_scans:
+                    mz_values = scan.mz
+                    intensities = scan.i
+                    writer.addSpectrum(mz_values, intensities, (x, y))
+                    x += 1  # Increment y-coordinate for each scan
+        return
+
+
+
+
+
+
+
+
+
     def calculate_logfile_extension(self, log_data):
         part_one = [x - self.extension.get() for x in log_data[::2]]
         part_one = np.array(part_one)
@@ -883,6 +955,29 @@ class ImageSynchronizer:
             sample_raw_data = df
             intensity_data_sample = eic_rawdata_dataframe_without_time['TIC'].to_numpy()
 
+        if data_type == 'mzml':
+            run = pymzml.run.Reader(self.directory)
+            times = []
+            intensities = []
+
+
+
+            for spectrum in run:
+                if spectrum.ms_level == 1:  # Only consider MS1 spectra for TIC
+                    times.append((spectrum.scan_time_in_minutes())*60)  # Time in seconds
+                    intensities.append(spectrum['total ion current'])  # Sum of intensities
+            intensity_data_sample = intensities
+            sum = pd.DataFrame({'Intensity': intensities})
+            time_data_sample = times
+            self.time_data_sample = time_data_sample
+
+            sample_raw_data = pd.DataFrame(
+                {'Times': times,
+                 'Intensities': intensities
+                 })
+
+
+
 
         logfile_dataframe = self.gui.importer.import_laser_logfile(logfile=logfile,
                                                                    laser_type=laser,
@@ -896,7 +991,6 @@ class ImageSynchronizer:
             mask_array=logfile_dataframe['Intended X(um)'].to_numpy(),
             on_value=(sum.max()) * 1.2,
             timestamp_array=logfile_dataframe['Timestamp'].to_numpy())
-
 
         self.import_separator = import_separator
         self.set_data_type(data_type)
