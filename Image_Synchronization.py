@@ -830,8 +830,13 @@ class ImageSynchronizer:
             if spectrum.ms_level == 1:  # Only consider MS1 spectra
                 scan_objects.append(spectrum)
 
+        filename = self.gui.filename_list[0].removesuffix('.mzml')
+        output_directory = self.gui.get_export_path()
+        with ImzMLWriter(output_filename=f'{output_directory}/{filename}_imzml', mode='processed') as writer:
 
-        with ImzMLWriter(output_filename='imzml_test', mode='processed') as writer:
+            last_key = list(self.gui.logfile_viewer.imzml_logfile_dictionary.keys())[-2]  # Get the last key
+            number_of_lines = self.gui.logfile_viewer.imzml_logfile_dictionary[last_key]['line_number']
+            self.gui.reset_progress()
 
             for sample_name, sample_dict in self.gui.logfile_viewer.imzml_logfile_dictionary.items():
                 if sample_name == 'Sample':
@@ -842,9 +847,13 @@ class ImageSynchronizer:
 
                 line_number = self.gui.logfile_viewer.imzml_logfile_dictionary[sample_name]['line_number']
                 selected_scans = scan_objects[closest_idx: closest_idx + amount_of_pixels_in_line]
+
+                self.gui.increase_progress(float(1/number_of_lines)*100)
+                self.gui.master_window.update_idletasks()
                 print(line_number)
 
-                x, y = x_offset_in_pixels, line_number  # Starting coordinates
+
+                x, y = x_offset_in_pixels+1, line_number  # Starting coordinates
                 for scan in selected_scans:
                     mz_values = scan.mz
                     intensities = scan.i
