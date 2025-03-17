@@ -336,6 +336,7 @@ class GUI:
         return synchronized
 
     def synchronize_data(self):
+        self.logfile_viewer.show_logfile()
         state = self.synchronizer.synchronize_data(data_type=self.widgets.data_type.get(),
                                            import_separator=self.widgets.separator_import.get(),
                                            laser=self.widgets.laser_type.get())
