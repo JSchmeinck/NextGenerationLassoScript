@@ -14,7 +14,6 @@ from tkinter import ttk
 from matplotlib.collections import LineCollection
 from tkinter import Menu
 from pyimzml.ImzMLWriter import ImzMLWriter
-from pyimzml.compression import ZlibCompression
 
 
 def mask_array(main_array, mask_array, on_value, timestamp_array):
@@ -117,6 +116,8 @@ class ImageSynchronizer:
         self.data_type = None
         self.import_separator = None
 
+        self.scan_objects = []
+
         self.move_left_button = ttk.Button(master=self.peripheral_frame,
                                            text='Move Left',
                                            command=lambda: self.move_laser_log_time(direction='left'))
@@ -147,85 +148,6 @@ class ImageSynchronizer:
         self.accept_button = ttk.Button(master=self.peripheral_frame,
                                         text='Accept', command=self.accept)
         self.accept_button.grid(row=0, column=7)
-
-        # Extension_GUI
-
-        self.subtract_extension_button = ttk.Button(master=self.peripheral_frame,
-                                           text='-',
-                                           command=lambda: self.extend_laser_log_time(direction='left'),
-                                           width=5)
-        self.subtract_extension_button.grid(row=1, column=0, sticky='e')
-        self.extension_increment = tk.DoubleVar(value=1.0)
-        self.extension_increment_entry = ttk.Entry(master=self.peripheral_frame,
-                                              textvariable=self.extension_increment,
-                                                   width=10)
-        self.extension_increment_entry.grid(row=1, column=1)
-        self.add_extension_button = ttk.Button(master=self.peripheral_frame,
-                                            text='+',
-                                            command=lambda: self.extend_laser_log_time(direction='right'),
-                                            width=5)
-        self.add_extension_button.grid(row=1, column=2, sticky='w')
-        self.reset_extension_button = ttk.Button(master=self.peripheral_frame,
-                                       text='Reset Extension',
-                                       command=self.reset_extension,
-                                       width=17)
-        self.reset_extension_button.grid(row=1, column=3)
-        self.current_extension_label = ttk.Label(master=self.peripheral_frame,
-                                              text='Current Extension:')
-        self.current_extension_label.grid(row=1, column=4)
-        self.current_extension = tk.StringVar(value='0 s')
-        self.current_extension_entry = ttk.Label(master=self.peripheral_frame,
-                                              textvariable=self.current_extension,
-                                              state=tk.DISABLED)
-        self.current_extension_entry.grid(row=1, column=5, padx=20)
-
-        self.checkbutton_multiple_samples = ttk.Checkbutton(master=self.peripheral_frame,
-                                                            text='Multiple Samples',
-                                                            onvalue=True,
-                                                            offvalue=False,
-                                                            variable=self.gui.widgets.multiple_samples,
-                                                            command=self.gui.change_of_synchronization_mode)
-        self.checkbutton_multiple_samples.grid(row=3, column=0, columnspan=2, pady=(10, 0), sticky='w')
-
-        self.first_line_synchronization_checkbutton = ttk.Checkbutton(master=self.peripheral_frame,
-                                                                      text='Use first Line for Synchronization',
-                                                                      onvalue=True,
-                                                                      offvalue=False,
-                                                                      variable=self.gui.widgets.first_line_synchronization,
-                                                                      command=self.gui.change_of_synchronization_mode)
-        self.first_line_synchronization_checkbutton.grid(row=3, column=2, columnspan=3, pady=(10, 0))
-
-        self.background_correction = tk.BooleanVar(value=False)
-        self.background_correction_checkbutton = ttk.Checkbutton(master=self.peripheral_frame,
-                                                                 text='Background Correction',
-                                                                 onvalue=True,
-                                                                 offvalue=False,
-                                                                 variable=self.background_correction,
-                                                                 command=self.show_background_correction)
-        self.background_correction_checkbutton.grid(row=2, column=0, columnspan=2, pady=(10, 0))
-
-        self.background_correction_offset_label = ttk.Label(master=self.peripheral_frame,
-                                                            text='Offset')
-        self.background_correction_offset_label.grid(row=2, column=2, columnspan=2, pady=(10, 0), sticky='e')
-        self.background_correction_offset = tk.DoubleVar(value=0.0)
-        self.background_correction_offset_entry = ttk.Entry(master=self.peripheral_frame,
-                                                            textvariable=self.background_correction_offset,
-                                                            state='disabled',
-                                                            width=10)
-        self.background_correction_offset_entry.bind("<Return>", self.update_background_correction)
-        self.background_correction_offset_entry.grid(row=2, column=4, pady=(10, 0), sticky='w')
-
-        self.background_correction_length_label = ttk.Label(master=self.peripheral_frame,
-                                                            text='Window Length')
-        self.background_correction_length_label.grid(row=2, column=5, pady=(10, 0))
-        self.background_correction_length = tk.DoubleVar(value=5.0)
-        self.background_correction_length_entry = ttk.Entry(master=self.peripheral_frame,
-                                                            textvariable=self.background_correction_length,
-                                                            state='disabled',
-                                                            width=10)
-        self.background_correction_length_entry.bind("<Return>", self.update_background_correction)
-        self.background_correction_length_entry.grid(row=2, column=6, pady=(10, 0))
-
 
         self.laser_log_plot = None
         self.raw_data_plot = None
@@ -316,59 +238,7 @@ class ImageSynchronizer:
 
         context_menu.post(event.x_root, event.y_root)
 
-    def show_background_correction(self):
-        if self.background_correction.get():
-            self.background_correction_offset_entry.configure(state='active')
-            self.background_correction_length_entry.configure(state='active')
 
-            x_data = self.laser_log_plot[0].get_xdata()[0::4].repeat(2)
-            x_data[0::2] = x_data[0::2] - self.background_correction_offset.get() - self.background_correction_length.get()
-            x_data[1::2] = x_data[1::2] - self.background_correction_offset.get()
-
-            y_data = np.zeros_like(x_data)
-
-            ticker = 0
-            for x_min, x_max, y_value in zip(x_data[::2], x_data[1::2], y_data[::2]):
-
-                line = self.ax.hlines(xmin=x_min, xmax=x_max, y=y_value, colors='r')
-
-                self.background_lines_dictionary[f'{self.samples[ticker]}'] = line
-                ticker += 1
-
-            self.fig.canvas.draw()
-
-
-        else:
-            self.background_correction_offset_entry.configure(state='disabled')
-            self.background_correction_length_entry.configure(state='disabled')
-
-            for i in self.background_lines_dictionary.values():
-                i.remove()
-            self.fig.canvas.draw()
-
-    def update_background_correction(self, event):
-        if self.background_correction.get():
-            for i in self.background_lines_dictionary.values():
-                i.remove()
-
-            self.background_lines_dictionary = {}
-
-            x_data = self.laser_log_plot[0].get_xdata()[0::4].repeat(2)
-            x_data[0::2] = x_data[0::2] - self.background_correction_offset.get() - self.background_correction_length.get()
-            x_data[1::2] = x_data[1::2] - self.background_correction_offset.get()
-
-            y_data = np.zeros_like(x_data)
-
-            ticker = 0
-            for x_min, x_max, y_value in zip(x_data[::2], x_data[1::2], y_data[::2]):
-                line = self.ax.hlines(xmin=x_min, xmax=x_max, y=y_value, colors='r')
-
-                self.background_lines_dictionary[f'{self.samples[ticker]}'] = line
-                ticker += 1
-
-            self.fig.canvas.draw()
-        else:
-            self.fig.canvas.draw()
     def toggle_window_visivility(self):
         if self.window.winfo_viewable():
             self.window.withdraw()
@@ -453,8 +323,9 @@ class ImageSynchronizer:
                 new_x_limits = [cur_xlim[0] - delta_x, cur_xlim[1] - delta_x]
                 self.ax.set_xlim(new_x_limits)
                 # Redraw the canvas
+        self.ax.figure.canvas.draw_idle()
+        self.window.update()
 
-        self.update_background_correction(event=None)
 
     def on_release(self, event):
 
@@ -467,21 +338,9 @@ class ImageSynchronizer:
         self.click_offset = 0
         self.current_offset.set(f'{self.click_offset} s')
         self.shifted_laser_log_time = self.laser_log_time
-        self.update_background_correction(event=None)
 
-    def reset_extension(self):
 
-        self.laser_log_time_extension = 0
 
-        self.clean_time_array_extended = self.clean_time_array.copy()
-
-        duplicated_time_array = self.clean_time_array.repeat(2)
-
-        self.laser_log_plot[0].set_xdata(duplicated_time_array)
-
-        self.current_extension.set(f'{self.laser_log_time_extension} s')
-
-        self.update_background_correction(event=None)
     def move_laser_log_time(self, direction):
 
         increment = self.move_increment.get()
@@ -501,299 +360,22 @@ class ImageSynchronizer:
         self.laser_log_time_offset = self.laser_log_time[0] - new_x[0]
         self.current_offset.set(f'{-round(self.laser_log_time_offset, 2)} s')
 
-        self.update_background_correction(event=None)
 
-    def extend_laser_log_time(self, direction):
 
-        is_sorted = lambda a: np.all(a[:-1] <= a[1:])
-
-        if direction == 'left':
-            self.laser_log_time_extension = self.laser_log_time_extension - self.extension_increment.get()
-
-        if direction == 'right':
-            self.laser_log_time_extension = self.laser_log_time_extension + self.extension_increment.get()
-
-        self.clean_time_array_extended = self.clean_time_array.copy()
-        self.clean_time_array_extended[0::2] = self.clean_time_array_extended[0::2] - self.laser_log_time_extension
-        self.clean_time_array_extended[1::2] = self.clean_time_array_extended[1::2] + self.laser_log_time_extension
-
-        if is_sorted(self.clean_time_array_extended):
-            pass
-        else:
-            if direction == 'left':
-                self.laser_log_time_extension = self.laser_log_time_extension + self.extension_increment.get()
-
-            if direction == 'right':
-                self.laser_log_time_extension = self.laser_log_time_extension - self.extension_increment.get()
-
-            self.clean_time_array_extended = self.clean_time_array.copy()
-            self.clean_time_array_extended[0::2] = self.clean_time_array_extended[0::2] - self.laser_log_time_extension
-            self.clean_time_array_extended[1::2] = self.clean_time_array_extended[1::2] + self.laser_log_time_extension
-
-        offset_time_array = self.clean_time_array_extended - self.laser_log_time_offset
-        duplicated_time_array = offset_time_array.repeat(2)
-
-        self.laser_log_plot[0].set_xdata(duplicated_time_array)
-
-        self.current_extension.set(f'{self.laser_log_time_extension} s')
-
-        self.update_background_correction(event=None)
 
     def accept(self):
         self.toggle_window_visivility()
         self.current_offset.set(f'0 s')
 
-        if self.data_type == 'mzml':
-            self.calculate_imzml_times()
-            self.gui.update_status()
-            return
-        if self.gui.widgets.multiple_samples.get():
-            self.calculate_samples_multiple_samples()
-        else:
-            self.calculate_samples()
-
-        self.gui.update_status()
-
-    def get_background_timestamps(self, sample_names_arr):
-        background_timestamps = []
-        for name in sample_names_arr:
-            segments = self.background_lines_dictionary[name].get_segments()
-            x_start = segments[0][0]  # x-coordinate at the start of the line
-            x_end = segments[0][1]
-            background_timestamps.append(x_start[0])
-            background_timestamps.append(x_end[0])
-        return np.array(background_timestamps)
-
-    def get_background_corrected_data(self, sample_data, background_data: np.array):
-        for column in background_data:
-            background_mean = np.mean(background_data[column])
-            sample_data[column] = sample_data[column]-background_mean
-        return sample_data
-    def calculate_samples(self):
-        self.sample_data_dictionary = {}
-        self.indices_dictionary = {}
-
-        time_windows_arr = self.clean_time_array_extended - self.laser_log_time_offset
-        if self.gui.widgets.first_line_synchronization.get():
-            time_windows_arr = time_windows_arr[2:]
-        df = self.sample_rawdata
-        sample_names_arr = self.samples
-        if self.gui.widgets.first_line_synchronization.get():
-            sample_names_arr = sample_names_arr[1:]
-
-        if self.background_correction.get():
-            background_timestamps = self.get_background_timestamps(sample_names_arr=sample_names_arr)
-
-        num_columns = df.shape[1]-1
-        list_of_column_names = list(df.columns.values)
-
-        max_length = max(len(time_windows_arr), len(sample_names_arr))
-
-        # Pad the arrays with np.nan values to make them the same length
-        time_windows_arr = np.pad(time_windows_arr, (0, max_length - len(time_windows_arr)), mode='constant',
-                                  constant_values=np.nan)
-        sample_names_arr = np.pad(sample_names_arr, (0, max_length - len(sample_names_arr)), mode='constant',
-                                  constant_values='')
-
-        # Create an empty dictionary to hold the data for each sample
-        samples_data = {}
-
-        # Create an empty list to hold the column names for each row
-        column_names_list = []
-
-        # Iterate through the time windows and sample names
-        for i in range(0, len(time_windows_arr), 2):
-            start_time = time_windows_arr[i]
-            end_time = time_windows_arr[i + 1]
-            sample_name = sample_names_arr[i // 2]
-
-            # Filter the rows that fall within the current time window for the current sample
-            mask = (df['Time'] >= start_time) & (df['Time'] <= end_time)
-            sample_data = df[mask].drop(columns='Time')
-            self.indices_dictionary[sample_name] = sample_data.index.tolist()
-
-            if self.background_correction.get():
-                background_start_time = background_timestamps[i]
-                background_end_time = background_timestamps[i + 1]
-                background_mask = (df['Time'] >= background_start_time) & (df['Time'] <= background_end_time)
-                background_data = df[background_mask].drop(columns='Time')
-                sample_data = self.get_background_corrected_data(sample_data=sample_data,
-                                                                 background_data=background_data)
-
-            # Store the filtered data as a new column in the dictionary
-            samples_data[sample_name] = np.concatenate([sample_data[col].values for col in sample_data.columns])
-
-            # Store the column names for each row
-            column_names_list.extend(sample_data.columns)
-
-        decider, length_of_arrays = self.check_array_length(samples_data)
-
-        magic_number = num_columns
-        if decider:
-            final_step = length_of_arrays / magic_number
-        else:
-            largest_value = max(length_of_arrays)
-
-            # Step 2: Iterate through the dictionary of numpy arrays
-            for key, array in samples_data.items():
-                # Step 3: Check if the length of the array matches the largest value
-                if len(array) == largest_value:
-                    final_step = len(array) / magic_number
-                else:
-                    # Calculate the integer and step as described in the question
-                    integer = (largest_value - len(array)) / magic_number
-                    step = len(array) / magic_number
-
-                    nan_values = np.full((int(integer),), np.nan)
-
-                    # Insert np.nan values at each step
-                    for i in range(1, magic_number+1):
-                        insert_index = (i * step) + ((i-1) * integer)
-                        if insert_index == array.size:
-                            array = np.concatenate((array, nan_values))
-                        else:
-                            array = np.insert(array, int(insert_index), nan_values)
-
-                    # Update the dictionary with the modified array
-                    samples_data[key] = array
+        self.calculate_imzml_times()
+        self.gui.notifications.notification_folder(header='Export Successful',
+                                                   body='The imzmL Files have been successfully created.',
+                                                   folder=self.gui.get_export_path())
+        return
 
 
-        # Convert the dictionary to a new DataFrame
-        result_df = pd.DataFrame(samples_data)
-
-        if self.data_type == 'iCap TQ (Daisy)':
-            self.list_of_unique_masses_in_file = list_of_column_names[1:]
-
-        for k, i in enumerate(self.list_of_unique_masses_in_file):
-            if k == 0:
-                mass_name_array = np.full(shape=(int(final_step),), fill_value=i)
-            else:
-                filler = np.full(shape=(int(final_step),), fill_value=i)
-                mass_name_array = np.concatenate((mass_name_array, filler))
-        result_df.insert(0, 'Unnamed: 2', mass_name_array)
-
-        self.sample_data_dictionary[self.gui.filename_list[0]] = result_df
-
-        self.gui.data_is_synchronized = True
-        if self.background_correction.get():
-            self.gui.data_is_background_corrected = True
-        if self.gui.widgets.first_line_synchronization.get():
-            self.gui.data_is_first_line_synchronized = True
-
-    def calculate_samples_multiple_samples(self):
-        self.sample_data_dictionary = {}
-        indices_dictionary = {}
 
 
-        logfile_dataframe = self.gui.importer.import_laser_logfile(logfile=self.gui.logfile_filepath,
-                                                                   laser_type=self.gui.widgets.laser_type.get(),
-                                                                   iolite_file=True,
-                                                                   rectangular_data_calculation=True,
-                                                                   logfile_viewer=True)
-        logfile, sample_overview_dictionary = self.gui.logfile_viewer.divide_samples(logfile=logfile_dataframe,
-                                                                            sample_overview=True)
-        df = self.sample_rawdata
-        for sample, infos in sample_overview_dictionary.items():
-            indices_of_samples = np.array(infos['idx_List'])
-            indices_of_samples = indices_of_samples.repeat(2)
-            indices_of_samples[1::2] = indices_of_samples[1::2]+1
-
-            sample_names_arr = infos['Names']
-
-            if self.background_correction.get():
-                background_timestamps = self.get_background_timestamps(sample_names_arr=sample_names_arr)
-
-            num_columns = df.shape[1]-1
-            list_of_column_names = list(df.columns.values)
-
-            time_windows_arr = self.clean_time_array_extended - self.laser_log_time_offset
-            time_windows_arr = time_windows_arr[indices_of_samples[0]:indices_of_samples[-1]+1]
-
-
-            # Create an empty dictionary to hold the data for each sample
-            samples_data = {}
-
-            # Create an empty list to hold the column names for each row
-            column_names_list = []
-
-            # Iterate through the time windows and sample names
-            for i in range(0, len(time_windows_arr), 2):
-                start_time = time_windows_arr[i]
-                end_time = time_windows_arr[i + 1]
-                sample_name = sample_names_arr[i // 2]
-
-                # Filter the rows that fall within the current time window for the current sample
-                mask = (df['Time'] >= start_time) & (df['Time'] <= end_time)
-                sample_data = df[mask].drop(columns='Time')
-                indices_dictionary[sample_name] = sample_data.index.tolist()
-
-                if self.background_correction.get():
-                    background_start_time = background_timestamps[i]
-                    background_end_time = background_timestamps[i + 1]
-                    background_mask = (df['Time'] >= background_start_time) & (df['Time'] <= background_end_time)
-                    background_data = df[background_mask].drop(columns='Time')
-                    sample_data = self.get_background_corrected_data(sample_data=sample_data,
-                                                                     background_data=background_data)
-
-                # Store the filtered data as a new column in the dictionary
-                samples_data[sample_name] = np.concatenate([sample_data[col].values for col in sample_data.columns])
-
-                # Store the column names for each row
-                column_names_list.extend(sample_data.columns)
-
-            decider, length_of_arrays = self.check_array_length(samples_data)
-
-            magic_number = num_columns
-            if decider:
-                final_step = length_of_arrays / magic_number
-            else:
-                largest_value = max(length_of_arrays)
-
-                # Step 2: Iterate through the dictionary of numpy arrays
-                for key, array in samples_data.items():
-                    # Step 3: Check if the length of the array matches the largest value
-                    if len(array) == largest_value:
-                        final_step = len(array) / magic_number
-                    else:
-                        # Calculate the integer and step as described in the question
-                        integer = (largest_value - len(array)) / magic_number
-                        step = len(array) / magic_number
-
-                        nan_values = np.full((int(integer),), np.nan)
-
-                        # Insert np.nan values at each step
-                        for i in range(1, magic_number+1):
-                            insert_index = (i * step) + ((i-1) * integer)
-                            if insert_index == array.size:
-                                array = np.concatenate((array, nan_values))
-                            else:
-                                array = np.insert(array, int(insert_index), nan_values)
-
-                        # Update the dictionary with the modified array
-                        samples_data[key] = array
-
-
-            # Convert the dictionary to a new DataFrame
-            result_df = pd.DataFrame(samples_data)
-
-            if self.data_type == 'iCap TQ (Daisy)':
-                self.list_of_unique_masses_in_file = list_of_column_names[1:]
-
-            for k, i in enumerate(self.list_of_unique_masses_in_file):
-                if k == 0:
-                    mass_name_array = np.full(shape=(int(final_step),), fill_value=i)
-                else:
-                    filler = np.full(shape=(int(final_step),), fill_value=i)
-                    mass_name_array = np.concatenate((mass_name_array, filler))
-            result_df.insert(0, 'Unnamed: 2', mass_name_array)
-
-            self.sample_data_dictionary[sample] = result_df
-
-        self.gui.data_is_synchronized = True
-        if self.background_correction.get():
-            self.gui.data_is_background_corrected = True
-        if self.gui.widgets.first_line_synchronization.get():
-            self.gui.data_is_first_line_synchronized = True
 
     def calculate_imzml_times(self):
 
@@ -808,11 +390,6 @@ class ImageSynchronizer:
         sample_names_arr = np.pad(sample_names_arr, (0, max_length - len(sample_names_arr)), mode='constant',
                                   constant_values='')
 
-        # Create an empty dictionary to hold the data for each sample
-        samples_data = {}
-
-        # Create an empty list to hold the column names for each row
-        column_names_list = []
 
         # Iterate through the time windows and sample names
         for i in range(0, len(time_windows_arr), 2):
@@ -824,11 +401,7 @@ class ImageSynchronizer:
         spotsize = self.gui.logfile_viewer.imzml_logfile_dictionary['Sample']['spotsize']
 
         mzml_file = self.gui.list_of_files[0]
-        run = pymzml.run.Reader(mzml_file)
-        scan_objects = []
-        for spectrum in run:
-            if spectrum.ms_level == 1:  # Only consider MS1 spectra
-                scan_objects.append(spectrum)
+
 
         filename = self.gui.filename_list[0].removesuffix('.mzml')
         output_directory = self.gui.get_export_path()
@@ -846,12 +419,9 @@ class ImageSynchronizer:
                 closest_idx = np.argmin(np.abs(self.time_data_sample - self.gui.logfile_viewer.imzml_logfile_dictionary[sample_name]['start_time']))
 
                 line_number = self.gui.logfile_viewer.imzml_logfile_dictionary[sample_name]['line_number']
-                selected_scans = scan_objects[closest_idx: closest_idx + amount_of_pixels_in_line]
+                selected_scans = self.scan_objects[closest_idx: closest_idx + amount_of_pixels_in_line]
 
-                self.gui.increase_progress(float(1/number_of_lines)*100)
-                self.gui.master_window.update_idletasks()
-                print(line_number)
-
+                self.gui.increase_progress(float(1/number_of_lines)*100*line_number)
 
                 x, y = x_offset_in_pixels+1, line_number  # Starting coordinates
                 for scan in selected_scans:
@@ -860,13 +430,6 @@ class ImageSynchronizer:
                     writer.addSpectrum(mz_values, intensities, (x, y))
                     x += 1  # Increment y-coordinate for each scan
         return
-
-
-
-
-
-
-
 
 
     def calculate_logfile_extension(self, log_data):
@@ -901,89 +464,35 @@ class ImageSynchronizer:
         else:
             return True, different_num_values
 
-    def synchronize_data(self, data_type, import_separator, laser, test=False, logfile=None):
+    def synchronize_data(self, data_type, laser, test=False, logfile=None):
         if test is False:
             self.directory = self.gui.list_of_files[0]
             self.filename = self.gui.filename_list[0]
             logfile = self.gui.logfile_filepath
 
-        if data_type == 'iCap TQ (Daisy)':
-            with open(self.directory) as file:
-                rawdata_dataframe = pd.read_csv(file, skiprows=13)
-            rawdata_dataframe_without_dwelltimes = rawdata_dataframe.drop(index=0)
-            rawdata_dataframe_without_dwelltimes_and_lastrow = rawdata_dataframe_without_dwelltimes.drop(
-                columns=rawdata_dataframe.columns[-1])
-            try:
-                rawdata_dataframe_without_dwelltime_and_time = rawdata_dataframe_without_dwelltimes_and_lastrow.drop(
-                    columns=rawdata_dataframe.columns[0])
-            except KeyError:
-                self.gui.notifications.notification_error(header='Data Type Error',
-                                                          body='Your Sample Data does not match your chosen Data Type')
-                return False
-            rawdata_dataframe_without_time = rawdata_dataframe_without_dwelltime_and_time.apply(pd.to_numeric)
-            sum = rawdata_dataframe_without_time.sum(axis=1)
-            rawdata_dataframe_without_time['TIC'] = sum
-            self.masses = list(rawdata_dataframe_without_time)
-            sample_raw_data = rawdata_dataframe_without_dwelltimes_and_lastrow
+        run = pymzml.run.Reader(self.directory)
+        times = []
+        intensities = []
+        self.scan_objects = []
 
-            time_data_sample = rawdata_dataframe_without_dwelltimes['Time'].to_numpy()
-            intensity_data_sample = rawdata_dataframe_without_time['TIC'].to_numpy()
+        number_of_spectra = run.get_spectrum_count()
+        spectrum_number = 0
+        for spectrum in run:
+            spectrum_number = spectrum_number + 1
+            self.gui.increase_progress(float(1 / number_of_spectra) * 100 * spectrum_number)
+            if spectrum.ms_level == 1:  # Only consider MS1 spectra for TIC
+                times.append((spectrum.scan_time_in_minutes())*60)  # Time in seconds
+                intensities.append(spectrum['total ion current'])  # Sum of intensities
+                self.scan_objects.append(spectrum)
+        intensity_data_sample = intensities
+        sum = pd.DataFrame({'Intensity': intensities})
+        time_data_sample = times
+        self.time_data_sample = time_data_sample
 
-        if data_type == 'EIC':
-            column_names = []
-            with open(self.directory) as f:
-                df_info = pd.read_csv(f, sep=import_separator, skiprows=0, engine='python', nrows=2)
-            header = df_info.columns
-            for i in header:
-                if 'Unnamed' in i:
-                    continue
-                else:
-                    column_names.append(i)
-
-            self.set_list_of_unique_masses_in_file(column_names[1:])
-
-            with open(self.directory) as f:
-                df = pd.read_csv(f, sep=import_separator, skiprows=1, engine='python', header=None)
-
-            try:
-                df.columns = column_names
-            except ValueError:
-                df.drop(columns=[df.columns[-1]], inplace=True)
-                df.columns = column_names
-            df.insert(0, 'Time', df['rt'] * 60)
-            df = df.drop(columns=(['rt']))
-
-            time_data_sample = df['Time'].to_numpy()
-
-            eic_rawdata_dataframe_without_time = df.drop(
-                columns=df.columns[0])
-            eic_rawdata_dataframe_without_time = eic_rawdata_dataframe_without_time.apply(pd.to_numeric)
-            sum = eic_rawdata_dataframe_without_time.sum(axis=1)
-            eic_rawdata_dataframe_without_time['TIC'] = sum
-            self.masses = list(eic_rawdata_dataframe_without_time)
-            sample_raw_data = df
-            intensity_data_sample = eic_rawdata_dataframe_without_time['TIC'].to_numpy()
-
-        if data_type == 'mzml':
-            run = pymzml.run.Reader(self.directory)
-            times = []
-            intensities = []
-
-
-
-            for spectrum in run:
-                if spectrum.ms_level == 1:  # Only consider MS1 spectra for TIC
-                    times.append((spectrum.scan_time_in_minutes())*60)  # Time in seconds
-                    intensities.append(spectrum['total ion current'])  # Sum of intensities
-            intensity_data_sample = intensities
-            sum = pd.DataFrame({'Intensity': intensities})
-            time_data_sample = times
-            self.time_data_sample = time_data_sample
-
-            sample_raw_data = pd.DataFrame(
-                {'Times': times,
-                 'Intensities': intensities
-                 })
+        sample_raw_data = pd.DataFrame(
+            {'Times': times,
+             'Intensities': intensities
+             })
 
 
 
@@ -1001,7 +510,6 @@ class ImageSynchronizer:
             on_value=(sum.max()) * 1.2,
             timestamp_array=logfile_dataframe['Timestamp'].to_numpy())
 
-        self.import_separator = import_separator
         self.set_data_type(data_type)
         self.set_mask(inverted_mask)
         self.set_sample_array(logfile_dataframe['Comment'].dropna().to_numpy())

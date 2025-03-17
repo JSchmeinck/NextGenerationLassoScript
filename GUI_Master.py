@@ -3,7 +3,6 @@ import pandas as pd
 import tkinter as tk
 from tkinter import filedialog
 import os
-import ExperimentClass
 import GUI_Widgets
 import Image_Synchronization
 from tkinter import messagebox
@@ -18,7 +17,7 @@ class GUI:
         self.master_window = master_window
         self.main=main
         self.master_window.title("LassoTool")
-        self.master_window.geometry('900x600')
+        self.master_window.geometry('800x500')
         self.master_window.resizable(width=False, height=False)
 
         self.importer = Importer.Importer(gui=self)
@@ -70,7 +69,6 @@ class GUI:
                                              text='',
                                              values=self.logfile_filename)
         self.reset_progress()
-        self.update_status(reset=True)
         return self.logfile_filepath
 
     def import_samples(self):
@@ -148,197 +146,10 @@ class GUI:
             self.widgets.samples_treeview.insert(parent='', index=i, text='', values=[str(k)])
 
         self.reset_progress()
-        self.update_status(reset=True)
-
-    def change_of_instrument(self):
-        """
-        When the user switches the data type of the mass spec, both treeviews are reset to show the
-        user that there is no compatibility between these data types. The import separator is adjusted to reflect
-        the most likely separator type of th current data type.
-        """
-        if self.widgets.data_type.get() == 'iCap TQ (Daisy)':
-            self.widgets.import_samples_button.configure(text='Import Sample')
-            self.widgets.separator_import.set(';')
-
-        if self.widgets.data_type.get() == 'Agilent 7900':
-            self.widgets.import_samples_button.configure(text='Import Sample Folder')
-            self.widgets.separator_import.set(',')
-        if self.widgets.data_type.get() == 'EIC':
-            self.widgets.import_samples_button.configure(text='Import Sample')
-            self.widgets.separator_import.set(';')
-        if self.widgets.data_type.get() == 'mzml':
-            self.widgets.import_samples_button.configure(text='Import Sample')
-            self.widgets.separator_import.set(';')
-
-    def change_of_synchronization_mode(self):
-        if self.widgets.synchronization.get():
-            self.widgets.move_up_button.configure(state='disabled')
-            self.widgets.move_down_button.configure(state='disabled')
-            self.widgets.button_synchronization.configure(state='active')
-            self.widgets.checkbutton_multiple_samples.configure(state='active')
-            self.widgets.checkbutton_first_line_synchronization.configure(state='active')
-            if self.widgets.multiple_samples.get():
-                self.widgets.view_logfile_button.configure(state='active')
-            else:
-                self.widgets.view_logfile_button.configure(state='disabled')
-            if self.widgets.data_type.get() == 'iCap TQ (Daisy)':
-                self.widgets.separator_import.set(',')
-        else:
-            self.widgets.move_up_button.configure(state='active')
-            self.widgets.move_down_button.configure(state='active')
-            self.widgets.checkbutton_first_line_synchronization.configure(state='disabled')
-            self.widgets.button_synchronization.configure(state='disabled')
-            self.widgets.view_logfile_button.configure(state='disabled')
-            self.widgets.checkbutton_multiple_samples.configure(state='disabled')
-
-        self.update_status()
-
-    def moveup(self):
-        """
-        Updates the treeview and the file and filename lists to reflect the users intend to reorganize
-        the sample input files before data conversion. This function moves one file one place up in the
-        treeview and file lists as long as its not the first one already.
-        """
-        selection = self.widgets.samples_treeview.selection()
-        if selection:
-            selected_item = selection[0]
-            index = self.widgets.samples_treeview.index(selected_item)
-            if index > 0:
-                self.widgets.samples_treeview.move(selected_item, '', index - 1)
-                self.list_of_files[index], self.list_of_files[index - 1] = self.list_of_files[index - 1], \
-                    self.list_of_files[index]
-                self.filename_list[index], self.filename_list[index - 1] = self.filename_list[index - 1], \
-                    self.filename_list[index]
-
-    def movedown(self):
-        """
-        Updates the treeview and the file and filename lists to reflect the users intend to reorganize
-        the sample input files before data conversion. This function moves one file one place down in the
-        treeview and file lists as long as its not the last one already.
-        """
-        selection = self.widgets.samples_treeview.selection()
-        if selection:
-            selected_item = selection[0]
-            index = self.widgets.samples_treeview.index(selected_item)
-            if index < len(self.list_of_files) - 1:
-                self.widgets.samples_treeview.move(selected_item, '', index + 2)
-                self.list_of_files[index], self.list_of_files[index + 1] = self.list_of_files[index + 1], \
-                    self.list_of_files[index]
-                self.filename_list[index], self.filename_list[index + 1] = self.filename_list[index + 1], \
-                    self.filename_list[index]
-
-    def build_experiment_objects(self):
-        """
-        Collect the data from the logfile and samples files/folders and creates the managing experiment instance
-        for the whole conversion.
-        """
-        self.reset_progress()
-
-        synchronized = self.synchronization_query()
-
-        multiple_samples = self.widgets.multiple_samples.get()
-
-        sample_rawdata_dictionary = self.importer.import_sample_file(data_type=self.widgets.data_type.get(),
-                                                                     synchronized=synchronized)
-
-        logfile_dataframe = self.importer.import_laser_logfile(logfile=self.logfile_filepath,
-                                                               laser_type=self.widgets.laser_type.get(),
-                                                               iolite_file=synchronized,
-                                                               rectangular_data_calculation=True)
-
-        if multiple_samples and self.widgets.data_type.get() != 'mzml':
-            logfile_dataframe = self.logfile_viewer.divide_samples(logfile=logfile_dataframe)
-
-        self.experiment = ExperimentClass.Experiment(gui=self,
-                                                     raw_laser_logfile_dataframe=logfile_dataframe,
-                                                     sample_rawdata_dictionary=sample_rawdata_dictionary,
-                                                     data_type=self.widgets.data_type.get(),
-                                                     logfile_filepath=self.logfile_filepath,
-                                                     fill_value=self.widgets.fill_value.get(),
-                                                     synchronized=synchronized)
-
-        self.experiment.build_rectangular_data()
-
-    def build_laserduration_sheet(self):
-        """
-        Collect the data from the logfile and creates the managing experiment instance
-        for the patter duration file.
-        """
-        self.reset_progress()
-        logfile_dataframe = self.importer.import_laser_logfile(logfile=self.logfile_filepath,
-                                                               laser_type='ImageBIO 266',
-                                                               iolite_file=False,
-                                                               rectangular_data_calculation=True)
-
-        self.experiment = ExperimentClass.Experiment(gui=self,
-                                                     raw_laser_logfile_dataframe=logfile_dataframe,
-                                                     sample_rawdata_dictionary={},
-                                                     data_type=self.widgets.data_type.get(),
-                                                     logfile_filepath=self.logfile_filepath,
-                                                     fill_value=None,
-                                                     synchronized=False)
-
-        self.experiment.build_laser_ablation_times()
-
-    def update_status(self, reset=False):
-        if reset:
-            self.data_is_synchronized = False
-            self.data_is_background_corrected = False
-            self.data_is_first_line_synchronized = False
-            self.multiple_samples_detected = False
-            self.widgets.data_is_synchronized_checkbutton.grid_remove()
-            self.widgets.first_line_for_synchronization_checkbutton.grid_remove()
-            self.widgets.background_corrected_checkbutton.grid_remove()
-            self.widgets.multiple_samples_detected_checkbutton.grid_remove()
-        if self.widgets.multiple_samples.get():
-            self.widgets.multiple_samples_detected_checkbutton.grid(row=0, column=0, padx=5, pady=5, sticky='w')
-            logfile_dataframe = self.importer.import_laser_logfile(logfile=self.logfile_filepath,
-                                                                   laser_type=self.widgets.laser_type.get(),
-                                                                   iolite_file=True,
-                                                                   rectangular_data_calculation=True)
-            if logfile_dataframe is False:
-                self.widgets.multiple_samples_detected_checkbutton.grid_remove()
-                self.widgets.multiple_samples.set(False)
-                return
-            if self.widgets.data_type.get() != 'mzml':
-                self.logfile_viewer.divide_samples(logfile=logfile_dataframe, multiple_samples_query=True)
-            self.widgets.multiple_samples_detected.set(self.multiple_samples_detected)
-        if self.widgets.synchronization.get():
-            self.widgets.data_is_synchronized_checkbutton.grid(row=0, column=0, padx=5, pady=5, sticky='w')
-            self.widgets.data_is_synchronized.set(self.data_is_synchronized)
-            self.widgets.first_line_for_synchronization_checkbutton.grid(row=1, column=0, padx=5, pady=5, sticky='w')
-            self.widgets.first_line_for_synchronization.set(self.data_is_first_line_synchronized)
-            self.widgets.background_corrected_checkbutton.grid(row=2, column=0, padx=5, pady=5, sticky='w')
-            self.widgets.background_corrected.set(self.data_is_background_corrected)
-        if self.widgets.synchronization.get() is False:
-            self.widgets.data_is_synchronized_checkbutton.grid_remove()
-            self.widgets.first_line_for_synchronization_checkbutton.grid_remove()
-            self.widgets.background_corrected_checkbutton.grid_remove()
-            self.widgets.multiple_samples_detected_checkbutton.grid_remove()
-
-    def synchronization_query(self):
-        if self.data_is_synchronized and self.widgets.synchronization:
-            synchronized = True
-        elif self.data_is_synchronized and self.widgets.synchronization.get() is False:
-            decider = self.notifications.notification_yesno(header='Synchronization Warning',
-                                               body='Your data is successfully synchronised but you have not ticked '
-                                                       'the Synchronize Checkbox. Do you want to continue '
-                                                       'with the synchronized data?')
-            synchronized = decider
-        elif self.data_is_synchronized is False and self.widgets.synchronization.get():
-            decider = self.notifications.notification_yesno(header='Synchronization Warning',
-                                               body='Your data not synchronised but you have ticked '
-                                                       'the Synchronize Checkbox. Do you want to continue '
-                                                       'with the unsynchronized data?')
-            synchronized = decider
-        else:
-            synchronized = False
-        return synchronized
 
     def synchronize_data(self):
         self.logfile_viewer.show_logfile()
         state = self.synchronizer.synchronize_data(data_type=self.widgets.data_type.get(),
-                                           import_separator=self.widgets.separator_import.get(),
                                            laser=self.widgets.laser_type.get())
         if state is False:
             return
@@ -391,8 +202,8 @@ class GUI:
         """
         Update the progress bar to increase the progress shown by a supplied step size
         """
-        current_progress = self.widgets.progress.get()
-        self.widgets.progress.set(current_progress + step)
+
+        self.widgets.progress.set(step)
         self.master_window.update_idletasks()
 
     def reset_progress(self):

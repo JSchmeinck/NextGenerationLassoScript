@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
-import os
-import pymzml
+
 
 class Importer:
     def __init__(self, gui):
@@ -143,8 +142,14 @@ class Importer:
 
                 spotsize_array = iolite_dataframe['Spot Size (um)'].to_numpy()
                 spotsize_array = spotsize_array[0::6]
+                spotsize_array[0] = spotsize_array[1]
+                spotsize_array[0] = spotsize_array[1]
+                if 'x' in spotsize_array[0]:
+                    # Extract the number before 'x' using vectorized string operations
+                    updated_value = spotsize_array[0].split(' x ')[0]  # Extract the number before 'x'
+                    updated_arr = np.full(spotsize_array.shape, int(updated_value))
+                    spotsize_array = updated_arr
                 spotsize_array = spotsize_array.repeat(2)
-                spotsize_array[1::2] = np.nan
 
                 x_array = iolite_dataframe['Intended X(um)'].dropna().values
                 y_array = iolite_dataframe['Intended Y(um)'].dropna().values
@@ -194,73 +199,7 @@ class Importer:
                 return logfile_dataframe
 
 
-    def import_sample_file(self, data_type, synchronized):
-        sample_rawdata_dictionary: dict = {}
-        if data_type == 'iCap TQ (Daisy)':
-            for n, m in enumerate(self.gui.list_of_files):
-                if synchronized:
-                    with open(m) as f:
-                        # First 15 lines have to be skipped (in Qtegra files)
-                        df: pd.DataFrame = pd.read_csv(filepath_or_buffer=f,
-                                                       sep=self.gui.get_separator_import(),
-                                                       skiprows=13)
-                    sample_rawdata_dictionary[f'{self.gui.filename_list[n]}'] = df
-                    break
-                else:
-                    with open(m) as f:
-                        # First 15 lines have to be skipped (in Qtegra files)
-                        df: pd.DataFrame = pd.read_csv(filepath_or_buffer=f,
-                                                       sep=self.gui.get_separator_import())
-                    sample_rawdata_dictionary[f'{self.gui.filename_list[n]}'] = df
 
-            return sample_rawdata_dictionary
-
-        if data_type == 'Agilent 7900':
-            # Loop through the imported directorys one by one
-            for n, m in enumerate(self.gui.list_of_files):
-                individual_lines_dictionary = {}
-                directory = os.fsencode(m)
-                # Loop trough the files inside the directory
-                for ticker, file in enumerate(os.listdir(directory)):
-                    filename = os.fsdecode(file)
-                    # Only use the files that are csv data
-                    if filename.endswith(".csv"):
-                        with open(f'{m}/{filename}') as f:
-                            df = pd.read_csv(filepath_or_buffer=f,
-                                             sep=self.gui.get_separator_import(),
-                                             skiprows=3,
-                                             skipfooter=1,
-                                             engine='python')
-                        individual_lines_dictionary[f'Line_{ticker + 1}'] = df
-                    sample_rawdata_dictionary[f'{self.gui.filename_list[n]}'] = individual_lines_dictionary
-
-            return sample_rawdata_dictionary
-
-        if data_type == 'EIC':
-            for n, m in enumerate(self.gui.list_of_files):
-                with open(m) as f:
-                    df: pd.DataFrame = pd.read_csv(f, sep=self.gui.get_separator_import(), skiprows=2, engine='python')
-                df.drop(columns=[df.columns[-1]], inplace=True)
-                sample_rawdata_dictionary, list_of_unique_masses_in_file, time_data_sample = self.gui.synchronizer.get_data(sample_name='Full Data')
-
-            return sample_rawdata_dictionary
-
-        if data_type == 'Imzml':
-            run = pymzml.run.Reader(self.gui.list_of_files[0])
-            times = []
-            intensities = []
-
-            for spectrum in run:
-                if spectrum.ms_level == 1:  # Only consider MS1 spectra for TIC
-                    times.append(spectrum.scan_time_in_minutes())  # Time in minutes
-                    intensities.append(sum(spectrum.i))  # Sum of intensities
-
-            sample_rawdata_dictionary = pd.DataFrame(
-                {'Times': times,
-                 'Intensities': intensities
-                 })
-
-            return sample_rawdata_dictionary
     
 
         
