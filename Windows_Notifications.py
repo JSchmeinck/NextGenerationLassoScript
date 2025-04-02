@@ -2,7 +2,6 @@ import win11toast
 
 import os
 import sys
-import subprocess
 
 
 def resource(relative_path):

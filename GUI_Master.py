@@ -1,11 +1,8 @@
-import numpy as np
-import pandas as pd
 import tkinter as tk
 from tkinter import filedialog
 import os
 import GUI_Widgets
 import Image_Synchronization
-from tkinter import messagebox
 import Importer
 import Logfile_Viewer
 import Windows_Notifications
@@ -205,6 +202,7 @@ class GUI:
 
         self.widgets.progress.set(step)
         self.master_window.update_idletasks()
+        self.master_window.update()
 
     def reset_progress(self):
         """

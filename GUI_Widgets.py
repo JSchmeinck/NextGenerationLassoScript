@@ -121,6 +121,14 @@ class GUIWidgets:
                                                  command=self.gui_master.synchronize_data,
                                                  state='active')
 
+        self.ms2_imaging =  tk.BooleanVar(value=False)
+        self.ms2_imaging_checkbutton = ttk.Checkbutton(master=self.master_window,
+                                         text="MS2 Imaging",
+                                                             onvalue=True,
+                                                             offvalue=False,
+                                                             variable=self.ms2_imaging,
+                                         width=20)
+
 
     def grid_gui_widgets(self):
         """
@@ -146,6 +154,8 @@ class GUIWidgets:
         self.synchronization_frame.grid_propagate(False)
         self.header_synchronization.grid(row=0, column=0, pady=(10, 0), padx=(5,0))
         self.button_synchronization.grid(row=2, column=0, pady=(10,0))
+
+        self.ms2_imaging_checkbutton.grid(row=4, column=1, pady=(5, 0), sticky='w')
 
         self.conversion_frame.grid(row=7, column=0, pady=10, columnspan=1, padx=(24,0))
         self.conversion_frame.grid_propagate(False)

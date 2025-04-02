@@ -1,7 +1,3 @@
-import os
-import tkinter.filedialog
-
-
 import pandas as pd
 import matplotlib.pyplot as plt
 import pymzml
@@ -11,9 +7,9 @@ import numpy as np
 from datetime import datetime
 import keyboard
 from tkinter import ttk
-from matplotlib.collections import LineCollection
 from tkinter import Menu
 from pyimzml.ImzMLWriter import ImzMLWriter
+from psims.transform.mzml import MzMLTransformer
 
 
 def mask_array(main_array, mask_array, on_value, timestamp_array):
@@ -114,7 +110,10 @@ class ImageSynchronizer:
         self.indices_dictionary = {}
         self.list_of_unique_masses_in_file = None
         self.data_type = None
-        self.import_separator = None
+        self.list_of_ms1_id = []
+        self.list_of_ms1_xposition = []
+        self.list_of_ms1_yposition = []
+        self.done = False
 
         self.scan_objects = []
 
@@ -400,12 +399,10 @@ class ImageSynchronizer:
         x_min = self.gui.logfile_viewer.imzml_logfile_dictionary['Sample']['x_min']
         spotsize = self.gui.logfile_viewer.imzml_logfile_dictionary['Sample']['spotsize']
 
-        mzml_file = self.gui.list_of_files[0]
-
 
         filename = self.gui.filename_list[0].removesuffix('.mzml')
         output_directory = self.gui.get_export_path()
-        with ImzMLWriter(output_filename=f'{output_directory}/{filename}_imzml', mode='processed') as writer:
+        with ImzMLWriter(output_filename=f'{output_directory}/{filename}_imzml', mode='processed') as imzml_writer:
 
             last_key = list(self.gui.logfile_viewer.imzml_logfile_dictionary.keys())[-2]  # Get the last key
             number_of_lines = self.gui.logfile_viewer.imzml_logfile_dictionary[last_key]['line_number']
@@ -425,10 +422,55 @@ class ImageSynchronizer:
 
                 x, y = x_offset_in_pixels+1, line_number  # Starting coordinates
                 for scan in selected_scans:
+                    if self.gui.widgets.ms2_imaging.get():
+                        id = scan.ID
+                        self.list_of_ms1_id.append(id)
+                        self.list_of_ms1_xposition.append(x)
+                        self.list_of_ms1_yposition.append(y)
                     mz_values = scan.mz
                     intensities = scan.i
-                    writer.addSpectrum(mz_values, intensities, (x, y))
+                    imzml_writer.addSpectrum(mz_values, intensities, (x, y))
                     x += 1  # Increment y-coordinate for each scan
+
+        if len(self.ms2_scan_objects) != 0:
+
+            self.ms1_scan_number = 0
+            self.number_ms1_scans = len(self.list_of_ms1_id)
+
+            def transform_drop_ms1(spectrum):
+                if self.done:
+                    return None
+                if spectrum['ms level'] == 1:
+                    return None
+                if self.gui.widgets.ms2_imaging.get():
+                    scan_id = spectrum.get('id')
+                    scan_id = int(scan_id.removeprefix('scan='))
+                    ms1_scan_id = self.list_of_ms1_id[self.ms1_scan_number]
+                    if scan_id == ms1_scan_id+1:
+                        user_params = {
+                            "x_position": str(self.list_of_ms1_xposition[self.ms1_scan_number]),
+                            "y_position": str(self.list_of_ms1_yposition[self.ms1_scan_number]),
+                        }
+
+                        for param_name, param_value in user_params.items():
+                            # In psims, user params are typically added to the spectrum's params dictionary
+                            spectrum.setdefault('params', {}).update({param_name: param_value})
+                        self.ms1_scan_number += 1
+                        if  self.ms1_scan_number > self.number_ms1_scans-1:
+                            self.done = True
+                    else:
+                        return None
+                return spectrum
+
+            filename = filename.removesuffix('.mzML')
+            with open(self.directory, 'rb') as in_stream, open(f'{output_directory}/{filename}_MS2.mzML', 'wb') as out_stream:
+                MzMLTransformer(in_stream, out_stream, transform_drop_ms1).write()
+
+        self.list_of_ms1_id = []
+        self.list_of_ms1_xposition = []
+        self.list_of_ms1_yposition = []
+        self.done = False
+
         return
 
 
@@ -470,22 +512,28 @@ class ImageSynchronizer:
             self.filename = self.gui.filename_list[0]
             logfile = self.gui.logfile_filepath
 
-        run = pymzml.run.Reader(self.directory)
+
         times = []
         intensities = []
-        self.scan_objects = []
-
-        number_of_spectra = run.get_spectrum_count()
         spectrum_number = 0
-        for spectrum in run:
+        self.scan_objects = []
+        self.ms2_scan_objects = []
+
+        self.run = pymzml.run.Reader(self.directory)
+        number_of_spectra = self.run.get_spectrum_count()
+
+        for spectrum in self.run:
             spectrum_number = spectrum_number + 1
             self.gui.increase_progress(float(1 / number_of_spectra) * 100 * spectrum_number)
-            if spectrum.ms_level == 1:  # Only consider MS1 spectra for TIC
+            if spectrum['ms level'] == 1:  # Only consider MS1 spectra for TIC
                 times.append((spectrum.scan_time_in_minutes())*60)  # Time in seconds
                 intensities.append(spectrum['total ion current'])  # Sum of intensities
                 self.scan_objects.append(spectrum)
+            if spectrum['ms level'] == 2:
+                self.ms2_scan_objects.append(spectrum)
+
         intensity_data_sample = intensities
-        sum = pd.DataFrame({'Intensity': intensities})
+        sum_of_intensities = pd.DataFrame({'Intensity': intensities})
         time_data_sample = times
         self.time_data_sample = time_data_sample
 
@@ -507,7 +555,7 @@ class ImageSynchronizer:
         masked_array, inverted_mask, time_array, self.clean_time_array = mask_array(
             main_array=logfile_dataframe['Y(um)'].to_numpy(),
             mask_array=logfile_dataframe['Intended X(um)'].to_numpy(),
-            on_value=(sum.max()) * 1.2,
+            on_value=(sum_of_intensities.max()) * 1.2,
             timestamp_array=logfile_dataframe['Timestamp'].to_numpy())
 
         self.set_data_type(data_type)

@@ -1,1 +1,1 @@
- pyinstaller --hidden-import xlsxwriter --onefile --icon=lassoimage.ico --add-data 'lassoimage.ico;.' --add-data 'Warning Icon.png;.' --add-data 'Error Icon.png;.' main.py
+ pyinstaller --hidden-import pymzml --icon=lassoimage.ico --add-data 'lassoimage.ico;.' --add-data 'Warning Icon.png;.' --add-data 'Error Icon.png;.' main.py

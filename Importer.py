@@ -21,12 +21,13 @@ class Importer:
             else:
                 with open(logfile) as file:
                     iolite_dataframe = pd.read_csv(file, skiprows=1, header=None)
-                iolite_dataframe.columns = ['Timestamp', 'Sequence Number', 'SubPoint Number', 'Vertex Number',
-                                            'Comment',
-                                            'X(um)', 'Y(um)', 'Intended X(um)', 'Intended Y(um)',
-                                            'Scan Velocity (um/s)',
-                                            'Laser State', 'Laser Rep. Rate (Hz)', 'Spot Type', 'Spot Size (um)',
-                                            'Spot Type', 'Spot Size', 'Spot Angle', 'MFC1', 'MFC2']
+
+                    iolite_dataframe.columns = ['Timestamp', 'Sequence Number', 'SubPoint Number', 'Vertex Number',
+                                                'Comment',
+                                                'X(um)', 'Y(um)', 'Intended X(um)', 'Intended Y(um)',
+                                                'Scan Velocity (um/s)',
+                                                'Laser State', 'Laser Rep. Rate (Hz)', 'Spot Type', 'Spot Size (um)',
+                                                'Spot Type', 'Spot Size', 'Spot Angle', 'MFC1', 'MFC2']
                 logfile_dictionary = {}
                 area_ablation = False
 
@@ -114,9 +115,11 @@ class Importer:
                                                  'Scan Velocity (um/s)',
                                                  'Laser State', 'Laser Rep. Rate (Hz)', 'Spot Type', 'Spot Size (um)']
                 except ValueError:
-                    self.gui.notifications.notification_error(header='Data Type Error',
-                                                              body='Your Logfile Data does not match your chosen Laser Type')
-                    return False
+                    iolite_dataframe.columns = ['Timestamp', 'Sequence Number', 'SubPoint Number', 'Vertex Number',
+                                                'Comment',
+                                                'X(um)', 'Y(um)', 'Intended X(um)', 'Intended Y(um)',
+                                                'Scan Velocity (um/s)',
+                                                'Laser State', 'Laser Rep. Rate (Hz)', 'Spot Type', 'Spot Size (um)', 'A', 'B', 'C', 'D', 'E']
 
                 logfile_dictionary = {}
 
@@ -178,9 +181,11 @@ class Importer:
                                                  'Scan Velocity (um/s)',
                                                  'Laser State', 'Laser Rep. Rate (Hz)', 'Spot Type', 'Spot Size (um)']
                 except ValueError:
-                    self.gui.notifications.notification_error(header='Data Type Error',
-                                                              body='Your Logfile Data does not match your chosen Laser Type')
-                    return False
+                    logfile_dataframe.columns = ['Timestamp', 'Sequence Number', 'SubPoint Number', 'Vertex Number',
+                                                 'Comment',
+                                                 'X(um)', 'Y(um)', 'Intended X(um)', 'Intended Y(um)',
+                                                 'Scan Velocity (um/s)',
+                                                 'Laser State', 'Laser Rep. Rate (Hz)', 'Spot Type', 'Spot Size (um)', 'A', 'B', 'C', 'D', 'E']
                 return logfile_dataframe
 
             else:
