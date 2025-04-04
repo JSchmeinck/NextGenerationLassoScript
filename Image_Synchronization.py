@@ -10,53 +10,69 @@ from tkinter import ttk
 from tkinter import Menu
 from pyimzml.ImzMLWriter import ImzMLWriter
 from psims.transform.mzml import MzMLTransformer
+import threading
 
 
-def mask_array(main_array, mask_array, on_value, timestamp_array):
+def mask_array(main_array, mask_array, on_value, timestamp_array, full_st_logfile=None, standard_logfile=False):
+    if standard_logfile:
+        reduced_on_array = np.full(len(full_st_logfile['Pattern #']), on_value)
+        extended_array = []
+        for i in range(0, len(reduced_on_array), 2):
+            sample = reduced_on_array[i:i + 2]
+            extended_array.extend([0, *sample, 0])
 
+        timestamp_array = full_st_logfile['Timestamp'].to_numpy()
+        time_objects = [datetime.strptime(time_str, '%Y-%m-%d %H:%M:%S.%f') for time_str in timestamp_array]
+
+        # Calculate time differences in seconds.milliseconds
+        start_time = time_objects[0]
+        time_diffs = [(time - start_time).total_seconds() for time in time_objects]
+        reduced_time_array = np.array(time_diffs)
+        duplicated_time_array = reduced_time_array.repeat(2)
+    else:
     # Create a boolean mask where the mask_array has the value 'Off'
-    mask = np.ma.masked_invalid(mask_array, copy=True)
+        mask = np.ma.masked_invalid(mask_array, copy=True)
 
-    boolean_mask = np.ma.getmaskarray(mask)
+        boolean_mask = np.ma.getmaskarray(mask)
 
-    inverted_boolean_mask = np.invert(boolean_mask)
-    # Use the boolean mask to update the main_array with the replacement_value
-    masked_array = np.where(boolean_mask, 0, main_array)
+        inverted_boolean_mask = np.invert(boolean_mask)
+        # Use the boolean mask to update the main_array with the replacement_value
+        masked_array = np.where(boolean_mask, 0, main_array)
 
-    # Set the values in main_array to replacement_value where mask_array has the value 'On'
-    masked_array[inverted_boolean_mask] = on_value
+        # Set the values in main_array to replacement_value where mask_array has the value 'On'
+        masked_array[inverted_boolean_mask] = on_value
 
-    reduced_on_array = masked_array[masked_array != 0]
+        reduced_on_array = masked_array[masked_array != 0]
 
-    zeros_array = np.array([0, 0])
+        zeros_array = np.array([0, 0])
 
-    extended_array = []
-    for i, value in enumerate(reduced_on_array):
-        extended_array.append(value)
-        if i % 2 == 1:  # Check if it's the second value
-            extended_array.extend(zeros_array)
+        extended_array = []
+        for i, value in enumerate(reduced_on_array):
+            extended_array.append(value)
+            if i % 2 == 1:  # Check if it's the second value
+                extended_array.extend(zeros_array)
 
-    extended_array = np.insert(extended_array, 0, 0)
+        extended_array = np.insert(extended_array, 0, 0)
 
-    extended_array = np.delete(extended_array, -1)
+        extended_array = np.delete(extended_array, -1)
 
 
-    time_objects = [datetime.strptime(time_str, '%Y-%m-%d %H:%M:%S.%f') for time_str in timestamp_array]
+        time_objects = [datetime.strptime(time_str, '%Y-%m-%d %H:%M:%S.%f') for time_str in timestamp_array]
 
-    # Calculate time differences in seconds.milliseconds
-    start_time = time_objects[0]
-    time_diffs = [(time - start_time).total_seconds() for time in time_objects]
+        # Calculate time differences in seconds.milliseconds
+        start_time = time_objects[0]
+        time_diffs = [(time - start_time).total_seconds() for time in time_objects]
 
-    # Convert time differences to a new numpy array
-    time_diff_array = np.array(time_diffs)
+        # Convert time differences to a new numpy array
+        time_diff_array = np.array(time_diffs)
 
-    masked_array_time = np.where(boolean_mask, -1, time_diff_array)
+        masked_array_time = np.where(boolean_mask, -1, time_diff_array)
 
-    reduced_time_array = masked_array_time[masked_array_time != -1]
+        reduced_time_array = masked_array_time[masked_array_time != -1]
 
-    duplicated_time_array = reduced_time_array.repeat(2)
+        duplicated_time_array = reduced_time_array.repeat(2)
 
-    return extended_array, inverted_boolean_mask, duplicated_time_array, reduced_time_array
+    return extended_array, duplicated_time_array, reduced_time_array
 
 
 
@@ -86,6 +102,7 @@ class ImageSynchronizer:
         self.time_data_sample = None
 
         self.laser_log_status = None
+        self.standard_logfile = False
         self.filename = None
         self.directory = None
 
@@ -103,7 +120,6 @@ class ImageSynchronizer:
         self.offset_axis = 0
         self.laser_log_time_offset = 0
         self.laser_log_time_extension = 0
-        self.logfile_mask = None
         self.samples = None
         self.sample_rawdata = None
         self.synchronized_data = None
@@ -359,6 +375,9 @@ class ImageSynchronizer:
         self.laser_log_time_offset = self.laser_log_time[0] - new_x[0]
         self.current_offset.set(f'{-round(self.laser_log_time_offset, 2)} s')
 
+        self.ax.figure.canvas.draw_idle()
+        self.window.update()
+
 
 
 
@@ -393,7 +412,10 @@ class ImageSynchronizer:
         # Iterate through the time windows and sample names
         for i in range(0, len(time_windows_arr), 2):
             start_time = time_windows_arr[i]
-            sample_name = sample_names_arr[i // 2]
+            if self.standard_logfile:
+                sample_name = sample_names_arr[i]
+            else:
+                sample_name = sample_names_arr[i // 2]
             self.gui.logfile_viewer.imzml_logfile_dictionary[sample_name]['start_time'] = start_time
 
         x_min = self.gui.logfile_viewer.imzml_logfile_dictionary['Sample']['x_min']
@@ -552,15 +574,25 @@ class ImageSynchronizer:
         if logfile_dataframe is False:
             return
 
-        masked_array, inverted_mask, time_array, self.clean_time_array = mask_array(
-            main_array=logfile_dataframe['Y(um)'].to_numpy(),
-            mask_array=logfile_dataframe['Intended X(um)'].to_numpy(),
-            on_value=(sum_of_intensities.max()) * 1.2,
-            timestamp_array=logfile_dataframe['Timestamp'].to_numpy())
+        if self.standard_logfile:
+            masked_array, time_array, self.clean_time_array = mask_array(
+                main_array=logfile_dataframe['Y(um)'].to_numpy(),
+                mask_array=None,
+                on_value=(sum_of_intensities.max()) * 1.2,
+                timestamp_array=None,
+                standard_logfile=self.standard_logfile,
+                full_st_logfile=logfile_dataframe)
+            self.set_sample_array(logfile_dataframe['Name'].to_numpy())
+        else:
+            masked_array, time_array, self.clean_time_array = mask_array(
+                main_array=logfile_dataframe['Y(um)'].to_numpy(),
+                mask_array=logfile_dataframe['Intended X(um)'].to_numpy(),
+                on_value=(sum_of_intensities.max()) * 1.2,
+                timestamp_array=logfile_dataframe['Timestamp'].to_numpy())
+            self.set_sample_array(logfile_dataframe['Comment'].dropna().to_numpy())
 
         self.set_data_type(data_type)
-        self.set_mask(inverted_mask)
-        self.set_sample_array(logfile_dataframe['Comment'].dropna().to_numpy())
+
         self.set_sample_raw_data(sample_raw_data)
         self.tic_data = intensity_data_sample
 
@@ -574,9 +606,6 @@ class ImageSynchronizer:
 
     def set_data_type(self, data_type):
         self.data_type = data_type
-
-    def set_mask(self, mask):
-        self.logfile_mask = mask
 
     def set_sample_array(self, sample_array):
         self.samples = sample_array
