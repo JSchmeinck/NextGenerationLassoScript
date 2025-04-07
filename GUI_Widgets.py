@@ -95,15 +95,7 @@ class GUIWidgets:
                                                 text='Laser Type',
                                                 borderwidth=5)
         self.laser_type = tk.StringVar()
-        self.laser_type.set('Cetac G2+')
-        self.imagebio_radiobutton = ttk.Radiobutton(master=self.datatype_frame,
-                                                   text='ImageBIO 266',
-                                                   variable=self.laser_type,
-                                                   value='ImageBIO 266')
-        self.cetac_g2plus_radiobutton = ttk.Radiobutton(master=self.datatype_frame,
-                                                       text='Cetac G2+',
-                                                       variable=self.laser_type,
-                                                       value='Cetac G2+')
+
 
         #The Synchronization menu
         self.synchronization_frame = ttk.Frame(master=self.master_window,
@@ -136,6 +128,9 @@ class GUIWidgets:
         :return: None
         """
 
+
+        self.build_import_ui()
+
         self.treeview_frame.grid(row=0, column=0, columnspan=1, rowspan=5, padx=(24, 0))
         self.treeview_frame.grid_propagate(False)
         self.import_logfile_button.grid(row=0, column=0, pady=5, padx=10)
@@ -147,8 +142,6 @@ class GUIWidgets:
         self.datatype_frame.grid(row=0, column=1, pady=(50,0), rowspan=2, sticky='w')
         self.datatype_frame.grid_propagate(False)
         self.header_laser.grid(row=0, column=1, pady=(10, 0))
-        self.imagebio_radiobutton.grid(row=1, column=1, padx=(10,0))
-        self.cetac_g2plus_radiobutton.grid(row=2, column=1, sticky='w', padx=(10,0))
 
         self.synchronization_frame.grid(row=3, column=1, pady=(5, 0), sticky='w')
         self.synchronization_frame.grid_propagate(False)
@@ -162,3 +155,16 @@ class GUIWidgets:
         self.directory_entry.grid(row=0, column=0, pady=(5, 0), columnspan=4, padx=(10, 0))
         self.browse_directory_button.grid(row=0, column=4, pady=(5, 0), sticky='w')
         self.progressbar.grid(row=5, column=0, columnspan=20, pady=(10, 0), padx=(10, 0))
+
+    def build_import_ui(self):
+        module_names = list(self.gui_master.modules.keys())
+        if module_names:
+            self.laser_type.set(module_names[0])
+
+        row_id = 1
+        for mod_name in self.gui_master.modules:
+            ttk.Radiobutton(
+                self.datatype_frame, text=mod_name, variable=self.laser_type, value=mod_name
+            ).grid(row=row_id, column=1, padx=(10,0), sticky='w')
+
+            row_id += 1

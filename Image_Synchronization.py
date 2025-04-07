@@ -13,64 +13,23 @@ from psims.transform.mzml import MzMLTransformer
 import threading
 
 
-def mask_array(main_array, mask_array, on_value, timestamp_array, full_st_logfile=None, standard_logfile=False):
-    if standard_logfile:
-        reduced_on_array = np.full(len(full_st_logfile['Pattern #']), on_value)
-        extended_array = []
-        for i in range(0, len(reduced_on_array), 2):
-            sample = reduced_on_array[i:i + 2]
-            extended_array.extend([0, *sample, 0])
+def mask_array(on_value, logfile):
 
-        timestamp_array = full_st_logfile['Timestamp'].to_numpy()
-        time_objects = [datetime.strptime(time_str, '%Y-%m-%d %H:%M:%S.%f') for time_str in timestamp_array]
+    reduced_on_array = np.full(len(logfile['Pattern #']), on_value)
+    extended_array = []
+    for i in range(0, len(reduced_on_array), 2):
+        sample = reduced_on_array[i:i + 2]
+        extended_array.extend([0, *sample, 0])
 
-        # Calculate time differences in seconds.milliseconds
-        start_time = time_objects[0]
-        time_diffs = [(time - start_time).total_seconds() for time in time_objects]
-        reduced_time_array = np.array(time_diffs)
-        duplicated_time_array = reduced_time_array.repeat(2)
-    else:
-    # Create a boolean mask where the mask_array has the value 'Off'
-        mask = np.ma.masked_invalid(mask_array, copy=True)
+    timestamp_array = logfile['Timestamp'].to_numpy()
+    time_objects = [datetime.strptime(time_str, '%Y-%m-%d %H:%M:%S.%f') for time_str in timestamp_array]
 
-        boolean_mask = np.ma.getmaskarray(mask)
+    # Calculate time differences in seconds.milliseconds
+    start_time = time_objects[0]
+    time_diffs = [(time - start_time).total_seconds() for time in time_objects]
+    reduced_time_array = np.array(time_diffs)
+    duplicated_time_array = reduced_time_array.repeat(2)
 
-        inverted_boolean_mask = np.invert(boolean_mask)
-        # Use the boolean mask to update the main_array with the replacement_value
-        masked_array = np.where(boolean_mask, 0, main_array)
-
-        # Set the values in main_array to replacement_value where mask_array has the value 'On'
-        masked_array[inverted_boolean_mask] = on_value
-
-        reduced_on_array = masked_array[masked_array != 0]
-
-        zeros_array = np.array([0, 0])
-
-        extended_array = []
-        for i, value in enumerate(reduced_on_array):
-            extended_array.append(value)
-            if i % 2 == 1:  # Check if it's the second value
-                extended_array.extend(zeros_array)
-
-        extended_array = np.insert(extended_array, 0, 0)
-
-        extended_array = np.delete(extended_array, -1)
-
-
-        time_objects = [datetime.strptime(time_str, '%Y-%m-%d %H:%M:%S.%f') for time_str in timestamp_array]
-
-        # Calculate time differences in seconds.milliseconds
-        start_time = time_objects[0]
-        time_diffs = [(time - start_time).total_seconds() for time in time_objects]
-
-        # Convert time differences to a new numpy array
-        time_diff_array = np.array(time_diffs)
-
-        masked_array_time = np.where(boolean_mask, -1, time_diff_array)
-
-        reduced_time_array = masked_array_time[masked_array_time != -1]
-
-        duplicated_time_array = reduced_time_array.repeat(2)
 
     return extended_array, duplicated_time_array, reduced_time_array
 
@@ -105,6 +64,8 @@ class ImageSynchronizer:
         self.standard_logfile = False
         self.filename = None
         self.directory = None
+
+        self.run = None
 
         self.laser_start_times_pointers = []
         self.laser_stop_times_pointers = []
@@ -367,7 +328,7 @@ class ImageSynchronizer:
             self.laser_log_plot[0].set_xdata(new_x)
             self.click_offset = self.click_offset - increment
 
-        if direction == 'right':
+        else:
             new_x = np.array([x + increment for x in old_x])
             self.laser_log_plot[0].set_xdata(new_x)
             self.click_offset = self.click_offset + increment
@@ -378,9 +339,6 @@ class ImageSynchronizer:
         self.ax.figure.canvas.draw_idle()
         self.window.update()
 
-
-
-
     def accept(self):
         self.toggle_window_visivility()
         self.current_offset.set(f'0 s')
@@ -390,10 +348,6 @@ class ImageSynchronizer:
                                                    body='The imzmL Files have been successfully created.',
                                                    folder=self.gui.get_export_path())
         return
-
-
-
-
 
     def calculate_imzml_times(self):
 
@@ -412,10 +366,7 @@ class ImageSynchronizer:
         # Iterate through the time windows and sample names
         for i in range(0, len(time_windows_arr), 2):
             start_time = time_windows_arr[i]
-            if self.standard_logfile:
-                sample_name = sample_names_arr[i]
-            else:
-                sample_name = sample_names_arr[i // 2]
+            sample_name = sample_names_arr[i]
             self.gui.logfile_viewer.imzml_logfile_dictionary[sample_name]['start_time'] = start_time
 
         x_min = self.gui.logfile_viewer.imzml_logfile_dictionary['Sample']['x_min']
@@ -495,39 +446,6 @@ class ImageSynchronizer:
 
         return
 
-
-    def calculate_logfile_extension(self, log_data):
-        part_one = [x - self.extension.get() for x in log_data[::2]]
-        part_one = np.array(part_one)
-        part_two = [x + self.extension.get() for x in log_data[1::2]]
-        part_two = np.array(part_two)
-        log_x_on_data = np.empty((part_one.size + part_two.size,), dtype=part_one.dtype)
-        log_x_on_data[0::2] = part_one
-        log_x_on_data[1::2] = part_two
-        return log_x_on_data
-
-    def check_array_length(self, data_dict):
-        different_num_values = set()
-
-        # Get the number of values for the first array to use it as the reference
-        reference_num_values = data_dict[list(data_dict.keys())[0]].size
-        different_num_values.add(reference_num_values)
-
-        # Iterate through the dictionary items
-        for key, arr in data_dict.items():
-            # Get the number of values in the current array
-            current_num_values = arr.size
-
-            # Check if the number of values is different from the reference
-            if current_num_values != reference_num_values:
-                different_num_values.add(current_num_values)
-
-        # Print the different number of values (if any)
-        if different_num_values:
-            return False, different_num_values
-        else:
-            return True, different_num_values
-
     def synchronize_data(self, data_type, laser, test=False, logfile=None):
         if test is False:
             self.directory = self.gui.list_of_files[0]
@@ -565,31 +483,11 @@ class ImageSynchronizer:
              })
 
 
+        masked_array, time_array, self.clean_time_array = mask_array(
+            on_value=(sum_of_intensities.max()) * 1.2,
+            logfile=self.gui.logfile)
+        self.set_sample_array(self.gui.logfile['Name'].to_numpy())
 
-
-        logfile_dataframe = self.gui.importer.import_laser_logfile(logfile=logfile,
-                                                                   laser_type=laser,
-                                                                   iolite_file=True,
-                                                                   rectangular_data_calculation=False)
-        if logfile_dataframe is False:
-            return
-
-        if self.standard_logfile:
-            masked_array, time_array, self.clean_time_array = mask_array(
-                main_array=logfile_dataframe['Y(um)'].to_numpy(),
-                mask_array=None,
-                on_value=(sum_of_intensities.max()) * 1.2,
-                timestamp_array=None,
-                standard_logfile=self.standard_logfile,
-                full_st_logfile=logfile_dataframe)
-            self.set_sample_array(logfile_dataframe['Name'].to_numpy())
-        else:
-            masked_array, time_array, self.clean_time_array = mask_array(
-                main_array=logfile_dataframe['Y(um)'].to_numpy(),
-                mask_array=logfile_dataframe['Intended X(um)'].to_numpy(),
-                on_value=(sum_of_intensities.max()) * 1.2,
-                timestamp_array=logfile_dataframe['Timestamp'].to_numpy())
-            self.set_sample_array(logfile_dataframe['Comment'].dropna().to_numpy())
 
         self.set_data_type(data_type)
 
@@ -622,22 +520,5 @@ class ImageSynchronizer:
         else:
             return self.sample_data_dictionary[sample_name], self.list_of_unique_masses_in_file, self.time_data_sample
 
-
-if __name__ == "__main__":
-    import main
-    root = tk.Tk()
-    root.iconbitmap("lassoimage.ico")
-    main_app = main.MainApp(master_window=root)
-    main_app.show_gui()
-
-    main_app.gui.synchronizer.directory = 'C:/Users/j_sch220/PycharmProjects/NextGenerationLassoScript/Testdata/Gelatine_EIC_Triggerlos_only427_195.csv'
-    main_app.gui.synchronizer.filename = 'Gelatine_EIC_Triggerlos_only427_195.csv'
-
-    main_app.gui.synchronizer.synchronize_data(data_type='EIC', laser='Cetac G2+', import_separator=';', test=True,
-                                               logfile='C:/Users/j_sch220/PycharmProjects/NextGenerationLassoScript/Testdata/Gelatineschnitt_log_Triggerlos.Iolite.csv')
-
-    main_app.gui.synchronizer.toggle_window_visivility()
-
-    tk.mainloop()
 
 

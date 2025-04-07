@@ -6,6 +6,7 @@ import Image_Synchronization
 import Importer
 import Logfile_Viewer
 import Windows_Notifications
+import importlib
 
 
 class GUI:
@@ -17,12 +18,11 @@ class GUI:
         self.master_window.geometry('800x500')
         self.master_window.resizable(width=False, height=False)
 
-        self.importer = Importer.Importer(gui=self)
         self.logfile_viewer = Logfile_Viewer.LogfileViewer(gui=self, master_window=master_window)
         self.notifications = Windows_Notifications.Notifications(gui=self)
 
-        self.widgets = GUI_Widgets.GUIWidgets(gui_master=self,
-                                              master_window=master_window)
+        self.modules = {}
+        self.load_import_modules()
 
         # The experiment Class that will be created for the post ablation data recreation
         self.experiment = None
@@ -30,19 +30,26 @@ class GUI:
         # Introducing general Variables of the GUI object
         self.list_of_files = []
         self.filename_list = []
-        self.idxs = None
-        self.pattern_csv_filepath_without_filename = None
         self.export_path_list = None
         self.logfile_filename = None
         self.logfile_filepath = None
+        self.logfile = None
 
         self.synchronizer = Image_Synchronization.ImageSynchronizer(master_gui=self, master_window=self.master_window)
-        self.data_is_synchronized = False
-        self.data_is_background_corrected = False
-        self.data_is_first_line_synchronized = False
-        self.multiple_samples_detected = False
-    def grid_gui_widgets(self):
+
+        self.widgets = GUI_Widgets.GUIWidgets(gui_master=self,
+                                              master_window=master_window)
+
         self.widgets.grid_gui_widgets()
+
+    def load_import_modules(self):
+        for file in os.listdir('Import Modules'):
+            if file.endswith(".py") and not file.startswith("__"):
+                mod_name = file[:-3]
+                full_module = f"{'Import Modules'}.{mod_name}"
+                module = importlib.import_module(full_module)
+                if hasattr(module, "run"):
+                    self.modules[mod_name] = module
 
     def import_logfile(self):
         """
@@ -161,33 +168,7 @@ class GUI:
         self.widgets.directory_entry.delete(0, tk.END)
         self.widgets.directory_entry.insert(0, path)
 
-    def get_separator_export(self):
-        """
-        Give the separator for the exported files chosen by the user to a requesting instance.
-        """
-        separator_list = self.widgets.separator_export.get()
-        if separator_list == 'Tab':
-            separator = '\t'
-        elif separator_list == 'Space':
-            separator = ' '
-        elif separator_list == 'Comma':
-            separator = ','
-        elif separator_list == 'Semicolon':
-            separator = ';'
-        return separator
 
-    def get_separator_import(self):
-        """
-        Give the separator for the exported files chosen by the user to a requesting instance.
-        """
-        separator_list = self.widgets.separator_import.get()
-        if separator_list == 'Tab':
-            separator = '\t'
-        elif separator_list == 'Space':
-            separator = ' '
-        else:
-            separator = separator_list
-        return separator
 
     def get_export_path(self):
         """

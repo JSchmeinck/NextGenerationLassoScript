@@ -10,15 +10,17 @@ class LogfileViewer:
         self.imzml_logfile_dictionary = {}
 
     def show_logfile(self):
-        self.polygon_dictionary = {}
 
+        selected = self.gui.widgets.laser_type.get()
+        if selected and selected in self.gui.modules:
+            print(f"Running {selected}")
+            logfile_dataframe = self.gui.modules[selected].run(self.gui.logfile_filepath)
+        else:
 
+            print("No module selected or module missing")
+            return None
 
-        logfile_dataframe = self.gui.importer.import_laser_logfile(logfile=self.gui.logfile_filepath,
-                                                                   laser_type=self.gui.widgets.laser_type.get(),
-                                                                   iolite_file=True,
-                                                                   rectangular_data_calculation=True,
-                                                                   logfile_viewer=True)
+        self.gui.logfile = logfile_dataframe
 
         self.buid_rectangles(logfile=logfile_dataframe)
 
