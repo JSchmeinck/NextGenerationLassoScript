@@ -120,6 +120,39 @@ class GUIWidgets:
                                                              offvalue=False,
                                                              variable=self.ms2_imaging,
                                          width=20)
+        self.bruker_rawdata = tk.BooleanVar(value=False)
+        self.bruker_rawdata_checkbutton = ttk.Checkbutton(master=self.master_window,
+                                                          text="Bruker Rawdata",
+                                                          onvalue=True,
+                                                          offvalue=False,
+                                                          variable=self.bruker_rawdata,
+                                                          width=20,
+                                                          command=self.activate_bruker_data)
+        self.static_number_of_scans = tk.BooleanVar(value=False)
+        self.static_scans_checkbutton = ttk.Checkbutton(master=self.master_window,
+                                                        text="Static Scan",
+                                                        onvalue=True,
+                                                        offvalue=False,
+                                                        variable=self.static_number_of_scans,
+                                                        state='disabled',
+                                                        width=20)
+        self.number_of_static_scans = tk.StringVar(value='1')
+        self.number_of_static_scans_entry = ttk.Entry(master=self.master_window,
+                                                      width=20,
+                                                      textvariable=self.number_of_static_scans,
+                                                      state='disabled')
+
+    def activate_bruker_data(self):
+        if self.bruker_rawdata.get():
+            self.static_scans_checkbutton.configure(state='active')
+            self.static_number_of_scans.set(True)
+            self.number_of_static_scans_entry.configure(state='active')
+        else:
+            self.static_scans_checkbutton.configure(state='disabled')
+            self.static_number_of_scans.set(False)
+            self.number_of_static_scans_entry.configure(state='disabled')
+            self.number_of_static_scans.set('1')
+
 
 
     def grid_gui_widgets(self):
@@ -148,7 +181,10 @@ class GUIWidgets:
         self.header_synchronization.grid(row=0, column=0, pady=(10, 0), padx=(5,0))
         self.button_synchronization.grid(row=2, column=0, pady=(10,0))
 
-        self.ms2_imaging_checkbutton.grid(row=4, column=1, pady=(5, 0), sticky='w')
+        self.bruker_rawdata_checkbutton.grid(row=5, column=1, pady=(0, 0), sticky='w')
+        self.static_scans_checkbutton.grid(row=6, column=1, pady=(0, 0), sticky='w')
+        self.ms2_imaging_checkbutton.grid(row=4, column=1, pady=(0, 0), sticky='w')
+        self.number_of_static_scans_entry.grid(row=7, column=1, pady=(0, 0), sticky='w')
 
         self.conversion_frame.grid(row=7, column=0, pady=10, columnspan=1, padx=(24,0))
         self.conversion_frame.grid_propagate(False)

@@ -42,6 +42,15 @@ def run(logfile):
         timestamp_array = iolite_dataframe[(iolite_dataframe['Laser State'] == 'On') & iolite_dataframe['Intended X(um)'].notna()]['Timestamp'].to_numpy()
 
         if np.all(spotsize == spotsize[0]):
+            if isinstance(spotsize[0], np.int64):
+                pass
+            else:
+                if 'x' in spotsize[0]:
+                    # Extract the number before 'x' using vectorized string operations
+                    updated_value = spotsize[0].split(' x ')[0]  # Extract the number before 'x'
+                    updated_arr = np.full(spotsize.shape, int(updated_value))
+                    spotsize = updated_arr
+
             spotsize_array = np.full(len(x_array), spotsize[0])
         else:
             return print('Not all spot sizes the same size')
@@ -54,6 +63,10 @@ def run(logfile):
 
 
     else:
+        timestamp_array = \
+        iolite_dataframe[(iolite_dataframe['Laser State'] == 'On') & iolite_dataframe['Intended X(um)'].notna()][
+            'Timestamp'].to_numpy()
+
         scan_speed_array = iolite_dataframe['Scan Velocity (um/s)'].dropna().values
         scan_speed_array[1::2] = np.nan
 

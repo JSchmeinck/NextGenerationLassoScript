@@ -31,14 +31,20 @@ class LogfileViewer:
         sample_number = 0
         self.imzml_logfile_dictionary = {}
         line_number = 0
+        y_values = []
+        names = []
         for idx, row in logfile.iloc[::2].iterrows():
+            if line_number == 0:
+                self.imzml_logfile_dictionary['Sample'] = {}
+                self.imzml_logfile_dictionary['Sample']['time_per_pixel'] = int(row['Spotsize']) / int(row['Scan Speed(Î¼m/sec)'])
+                #self.imzml_logfile_dictionary['Sample']['time_per_pixel'] = 20 / row['Scan Speed(Î¼m/sec)']
             line_number = line_number + 1
             if 'start' in row['Name']:
                 sample_number += 1
             x_start = row['X(um)']/1000
             y_start = row['Y(um)']/1000
             width = (logfile.loc[idx + 1, 'X(um)'] - row['X(um)'])/1000
-            height = row['Spotsize']/1000
+            height = int(row['Spotsize'])/1000
 
             if idx == 0:
                 xmin = x_start
@@ -55,13 +61,27 @@ class LogfileViewer:
                 ymax = (y_start + height)
 
             self.imzml_logfile_dictionary[row['Name']] = {}
-            self.imzml_logfile_dictionary[row['Name']]['line_number'] = line_number
+
+            if row['Y(um)']/1000 in y_values:
+                line_number = line_number - 1
+                index = y_values.index(row['Y(um)']/1000)
+                name = names[index]
+                self.imzml_logfile_dictionary[row['Name']]['line_number'] = self.imzml_logfile_dictionary[name]['line_number']
+            else:
+                y_values.append(row['Y(um)'] / 1000)
+                names.append(row['Name'])
+                self.imzml_logfile_dictionary[row['Name']]['line_number'] = line_number
+
+
             self.imzml_logfile_dictionary[row['Name']]['x_start'] = x_start
             self.imzml_logfile_dictionary[row['Name']]['pixel_number'] = round(width/height)
+            #self.imzml_logfile_dictionary[row['Name']]['pixel_number'] = round(width / 0.02)
 
-        self.imzml_logfile_dictionary['Sample'] = {}
+
         self.imzml_logfile_dictionary['Sample']['x_min'] = xmin
         self.imzml_logfile_dictionary['Sample']['spotsize'] = height
+        #self.imzml_logfile_dictionary['Sample']['spotsize'] = 0.02
+
 
 
 

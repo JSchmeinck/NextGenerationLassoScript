@@ -4,12 +4,12 @@ import sys
 import os
 
 
-def resource(relative_path):
-    base_path = getattr(
-        sys,
-        '_MEIPASS',
-        os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(base_path, relative_path)
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    if hasattr(sys, '_MEIPASS'):
+        # PyInstaller stores temp files here
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
 
 class MainApp:
     def __init__(self, master_window):
@@ -21,6 +21,6 @@ class MainApp:
 
 if __name__ == '__main__':
     root = tk.Tk()
-    root.iconbitmap(resource("lassoimage.ico"))
+    root.iconbitmap(resource_path("lassoimage.ico"))
     main_app = MainApp(master_window=root)
     tk.mainloop()

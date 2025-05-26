@@ -3,10 +3,10 @@ from tkinter import filedialog
 import os
 import GUI_Widgets
 import Image_Synchronization
-import Importer
 import Logfile_Viewer
 import Windows_Notifications
 import importlib
+import main
 
 
 class GUI:
@@ -43,7 +43,8 @@ class GUI:
         self.widgets.grid_gui_widgets()
 
     def load_import_modules(self):
-        for file in os.listdir('Import Modules'):
+        module_folder = main.resource_path('Import Modules')
+        for file in os.listdir(module_folder):
             if file.endswith(".py") and not file.startswith("__"):
                 mod_name = file[:-3]
                 full_module = f"{'Import Modules'}.{mod_name}"
@@ -81,61 +82,15 @@ class GUI:
         folders/files is inserted into the corresponding Treeview. Resets the list of files and filenames and
         updates them with the new samples.
         """
-        if self.widgets.data_type.get() == 'iCap TQ (Daisy)':
-            self.list_of_files = []
-            self.filename_list = []
-
-            samples_filepath = tk.filedialog.askopenfilenames(title='Choose your sample files',
-                                                              filetypes=[('CSV', '*.csv')])
-
-            for i in samples_filepath:
-                filename = os.path.basename(i)
-                if filename in self.filename_list:
-                    continue
-                else:
-                    self.filename_list.append(filename)
-
-            for i in samples_filepath:
-                if i in self.list_of_files:
-                    continue
-                else:
-                    self.list_of_files.append(i)
-
-        if self.widgets.data_type.get() == 'Agilent 7900':
-
-            self.list_of_files = []
-            self.filename_list = []
-            folder_filepath = tk.filedialog.askdirectory(title='Choose your sample folder')
-
-            folders = [os.path.abspath(os.path.join(folder_filepath, f)) for f in os.listdir(folder_filepath) if
-                       os.path.isdir(os.path.join(folder_filepath, f))]
-            for folder in folders:
-                foldername = os.path.basename(folder)
-                if foldername in self.filename_list:
-                    pass
-                else:
-                    self.filename_list.append(foldername)
-
-                if folder in self.list_of_files:
-                    pass
-                else:
-                    self.list_of_files.append(folder)
-
-        if self.widgets.data_type.get() == 'EIC':
-            self.list_of_files = []
-            self.filename_list = []
-
-            file = tk.filedialog.askopenfilename(title='Choose your sample File',
-                                                              filetypes=[('CSV', '*.csv')])
-
-            self.filename_list = [os.path.basename(file)]
-            self.list_of_files = [file]
 
         if self.widgets.data_type.get() == 'mzml':
             self.list_of_files = []
             self.filename_list = []
 
-            file = tk.filedialog.askopenfilename(title='Choose your sample File',
+            if self.widgets.bruker_rawdata.get():
+                file = tk.filedialog.askdirectory(title='Choose your sample folder')
+            else:
+                file = tk.filedialog.askopenfilename(title='Choose your sample File',
                                                               filetypes=[('MZml', '*.mzml')])
 
             self.filename_list = [os.path.basename(file)]
