@@ -36,6 +36,9 @@ class LogfileViewer:
 
         self.imzml_logfile_dictionary = {}
 
+        self.logfile_changed = False
+        self.updated_logfile = None
+
     def on_closing(self):
         self.window.withdraw()
 
@@ -75,6 +78,8 @@ class LogfileViewer:
         self.window.deiconify()
 
     def buid_rectangles(self, logfile):
+        if self.logfile_changed is True:
+            logfile = self.updated_logfile
         self.rectangles_dictionary = {}
         sample_number = 0
         self.imzml_logfile_dictionary = {}
@@ -182,7 +187,7 @@ class LogfileViewer:
                 list_of_sample_names.append(name)
                 list_of_sample_x_starts.append(x_start)
                 list_of_sample_x_ends.append(x_end)
-                list_of_sample_y_bottoms.append(y_bottom)
+                list_of_sample_y_bottoms.append(round(y_bottom, 3))
                 list_of_sample_spotsizes.append(spotsize)
                 sample_new = False
             else:
@@ -203,6 +208,7 @@ class LogfileViewer:
                     list_of_sample_y_bottoms = []
                     list_of_sample_spotsizes = []
                     continue
+                what = float("{:.3f}".format(y_bottom - spotsize))
                 if float("{:.3f}".format(y_bottom - spotsize)) not in list_of_sample_y_bottoms:
                     logfile.loc[list_of_sample_idx[0], 'Name'] = f'{logfile.loc[list_of_sample_idx[0], "Name"]} (start)'
                     logfile.loc[list_of_sample_idx[-1], 'Name'] = f'{logfile.loc[list_of_sample_idx[-1], "Name"]} (end)'
@@ -220,44 +226,27 @@ class LogfileViewer:
                     list_of_sample_y_bottoms = []
                     list_of_sample_spotsizes = []
                     continue
+                number = 0
                 for x_start_legacy, x_end_legacy in zip(list_of_sample_x_starts, list_of_sample_x_ends):
+                    number += 1
                     # x_start is inside the legacy line and x_end is inside the legacy line
-                    if x_start_legacy <= x_start and x_end <= x_end_legacy:
+                    if (x_start_legacy <= x_start <= x_end_legacy) or (x_start_legacy <= x_end <= x_end_legacy):
                         list_of_sample_idx.append(idx)
                         list_of_sample_names.append(name)
                         list_of_sample_x_starts.append(x_start)
                         list_of_sample_x_ends.append(x_end)
-                        list_of_sample_y_bottoms.append(y_bottom)
+                        list_of_sample_y_bottoms.append(round(y_bottom, 3))
                         list_of_sample_spotsizes.append(spotsize)
                         break
-                    # x_start is to the left of the legacy line and x_end is inside the legacy line
-                    elif x_end_legacy >= x_start <= x_start_legacy <= x_end <= x_end_legacy:
+                    if (x_start_legacy >= x_start) and (x_end >= x_end_legacy):
                         list_of_sample_idx.append(idx)
                         list_of_sample_names.append(name)
                         list_of_sample_x_starts.append(x_start)
                         list_of_sample_x_ends.append(x_end)
-                        list_of_sample_y_bottoms.append(y_bottom)
+                        list_of_sample_y_bottoms.append(round(y_bottom, 3))
                         list_of_sample_spotsizes.append(spotsize)
                         break
-                    # x_start is inside the legacy line and x_end is to the right of the legacy line
-                    elif x_start_legacy <= x_start <= x_end_legacy <= x_end >= x_start_legacy:
-                        list_of_sample_idx.append(idx)
-                        list_of_sample_names.append(name)
-                        list_of_sample_x_starts.append(x_start)
-                        list_of_sample_x_ends.append(x_end)
-                        list_of_sample_y_bottoms.append(y_bottom)
-                        list_of_sample_spotsizes.append(spotsize)
-                        break
-                    # x_start is to the left of the legacy line and x_end is to the right of the legacy line
-                    elif x_start_legacy >= x_start <= x_end_legacy <= x_end >= x_start_legacy:
-                        list_of_sample_idx.append(idx)
-                        list_of_sample_names.append(name)
-                        list_of_sample_x_starts.append(x_start)
-                        list_of_sample_x_ends.append(x_end)
-                        list_of_sample_y_bottoms.append(y_bottom)
-                        list_of_sample_spotsizes.append(spotsize)
-                        break
-                    else:
+                    if number == len(list_of_sample_x_starts):
                         logfile.loc[
                             list_of_sample_idx[0], 'Name'] = f'{logfile.loc[list_of_sample_idx[0], "Name"]} (start)'
                         logfile.loc[
@@ -275,7 +264,6 @@ class LogfileViewer:
                         list_of_sample_x_ends = []
                         list_of_sample_y_bottoms = []
                         list_of_sample_spotsizes = []
-                        break
             if idx == len(logfile)-2:
                 logfile.loc[list_of_sample_idx[0], 'Name'] = f'{logfile.loc[list_of_sample_idx[0], "Name"]} (start)'
                 logfile.loc[list_of_sample_idx[-1], 'Name'] = f'{logfile.loc[list_of_sample_idx[-1], "Name"]} (end)'
@@ -284,6 +272,9 @@ class LogfileViewer:
                 sample_overview_dictionary[f'Sample {sample_number}']['End_Name'] = list_of_sample_names[-1]
                 sample_overview_dictionary[f'Sample {sample_number}']['idx_List'] = list_of_sample_idx
                 sample_overview_dictionary[f'Sample {sample_number}']['Names'] = list_of_sample_names
+
+        self.logfile_changed = True
+        self.updated_logfile = logfile
 
         if sample_overview:
             return logfile, sample_overview_dictionary

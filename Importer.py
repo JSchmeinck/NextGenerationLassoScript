@@ -129,6 +129,7 @@ class Importer:
                 run_queue_order_array = pattern_number_array.copy()
                 pattern_number_array[1::2] = np.nan
 
+
                 run_queue_order_array = run_queue_order_array - 1
                 run_queue_order_array[1::2] = np.nan
 
@@ -138,13 +139,21 @@ class Importer:
 
                 type_array = iolite_dataframe['Laser State'].to_numpy()
                 type_array = type_array[0::6]
+
                 type_array = type_array.repeat(2)
                 type_array[1::2] = np.nan
 
                 spotsize_array = iolite_dataframe['Spot Size (um)'].to_numpy()
                 spotsize_array = spotsize_array[0::6]
+                if isinstance(spotsize_array[0], np.int64):
+                    pass
+                else:
+                    if 'x' in spotsize_array[1]:
+                        # Extract the number before 'x' using vectorized string operations
+                        updated_value = spotsize_array[1].split(' x ')[0]  # Extract the number before 'x'
+                        updated_arr = np.full(spotsize_array.shape, int(updated_value))
+                        spotsize_array = updated_arr
                 spotsize_array = spotsize_array.repeat(2)
-                spotsize_array[1::2] = np.nan
 
                 x_array = iolite_dataframe['Intended X(um)'].dropna().values
                 y_array = iolite_dataframe['Intended Y(um)'].dropna().values
