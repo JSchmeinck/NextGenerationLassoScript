@@ -13,6 +13,7 @@ import MzMLParser
 import threading
 import SQlite_Processing
 import SQLite_processing2
+import os
 
 
 def mask_array(on_value, logfile):
@@ -409,14 +410,23 @@ class ImageSynchronizer:
                     pixelypos.append(y)
                     pixeltimes.append(start_time)
                     line_length.append(amount_of_pixels_in_line)
-
-                SQLite_processing2.create_maldi_table(db_path=fr'{self.directory}\analysis.tdf',
+                filepath = os.path.join(self.directory, 'analysis.tdf')
+                if os.path.isfile(filepath):
+                    SQLite_processing2.create_maldi_table(db_path=fr'{self.directory}\analysis.tdf',
                                                       pixeltimes=np.array(pixeltimes),
                                                       pixelxpos=np.array(pixelxpos),
                                                       pixelypos=np.array(pixelypos),
                                                       spot_size=spotsize * 1000,
                                                       line_length=np.array(line_length),
                                                       scans_per_ms1=scans_per_ms1)
+                else:
+                    SQLite_processing2.create_maldi_table(db_path=fr'{self.directory}\analysis.tsf',
+                                                          pixeltimes=np.array(pixeltimes),
+                                                          pixelxpos=np.array(pixelxpos),
+                                                          pixelypos=np.array(pixelypos),
+                                                          spot_size=spotsize * 1000,
+                                                          line_length=np.array(line_length),
+                                                          scans_per_ms1=scans_per_ms1)
 
                 return
 
@@ -444,7 +454,17 @@ class ImageSynchronizer:
                         pixelxpos.append(x)
                         pixelypos.append(y)
                         x += 1
-                SQlite_Processing.create_maldi_table(db_path=fr'{self.directory}\analysis.tdf',
+                filepath = os.path.join(self.directory, 'analysis.tdf')
+                if os.path.isfile(filepath):
+
+                    SQlite_Processing.create_maldi_table(db_path=fr'{self.directory}\analysis.tdf',
+                                                     pixeltimes=np.array(pixeltimes),
+                                                     pixelxpos=np.array(pixelxpos),
+                                                     pixelypos=np.array(pixelypos),
+                                                     time_tolerance=time_per_pixel/4,
+                                                     spot_size=spotsize*1000)
+                else:
+                    SQlite_Processing.create_maldi_table(db_path=fr'{self.directory}\analysis.tsf',
                                                      pixeltimes=np.array(pixeltimes),
                                                      pixelxpos=np.array(pixelxpos),
                                                      pixelypos=np.array(pixelypos),
@@ -519,7 +539,12 @@ class ImageSynchronizer:
         self.scan_objects = []
         self.ms2_scan_objects = []
         if self.gui.widgets.bruker_rawdata.get():
-            time_data_sample, intensity_data_sample = SQlite_Processing.extract_ms1_data(db_path=fr'{self.directory}\analysis.tdf')
+            filepath = os.path.join(self.directory, 'analysis.tdf')
+            if os.path.isfile(filepath):
+                time_data_sample, intensity_data_sample = SQlite_Processing.extract_ms1_data(db_path=fr'{self.directory}\analysis.tdf')
+            else:
+                time_data_sample, intensity_data_sample = SQlite_Processing.extract_ms1_data(
+                    db_path=fr'{self.directory}\analysis.tsf')
         else:
             tic_data, self.ms1_scans = MzMLParser.parse_mzml_manual_iterative(filepath=self.directory, gui=self.gui)
             time_data_sample, intensity_data_sample = tic_data
